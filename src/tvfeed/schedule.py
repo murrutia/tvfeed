@@ -15,12 +15,29 @@ from .sources import Video
 
 @dataclass
 class Slot:
+    """Créneau de la grille.
+
+    Attributes:
+        video: Vidéo diffusée.
+        start: Début du créneau.
+        end: Fin du créneau.
+    """
+
     video: Video
     start: datetime
     end: datetime
 
 
 def build_playlist(videos: list[Video], seed: int) -> list[Video]:
+    """Mélange les vidéos d'une chaîne de façon reproductible.
+
+    Args:
+        videos: Vidéos de toutes les sources de la chaîne, doublons possibles.
+        seed: Graine du mélange.
+
+    Returns:
+        Les vidéos sans doublon, dans un ordre qui ne dépend que de `seed`.
+    """
     # Dédoublonnage + tri pour que le mélange ne dépende que de la graine.
     unique = sorted({v.id: v for v in videos}.values(), key=lambda v: v.id)
     random.Random(seed).shuffle(unique)
@@ -30,6 +47,19 @@ def build_playlist(videos: list[Video], seed: int) -> list[Video]:
 def build_schedule(
     playlist: list[Video], anchor: datetime, now: datetime, hours: float
 ) -> list[Slot]:
+    """Calcule la grille à partir de la vidéo en cours.
+
+    Args:
+        playlist: Playlist de la chaîne, jouée en boucle.
+        anchor: Instant où la playlist a démarré.
+        now: Instant courant.
+        hours: Durée couverte par la grille, en heures.
+
+    Returns:
+        Les créneaux successifs. Le premier est la vidéo en cours (commencée avant
+        `now`) ; le dernier se termine après `now + hours`. Liste vide si la
+        playlist est vide.
+    """
     if not playlist:
         return []
     total = sum(v.duration for v in playlist)

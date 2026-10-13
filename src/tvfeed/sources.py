@@ -10,6 +10,7 @@ from pathlib import Path
 from yt_dlp import YoutubeDL
 
 CACHE_TTL = 6 * 3600
+"""Durée de validité du cache, en secondes."""
 
 # URL de chaîne sans onglet : on cible l'onglet "Vidéos" (exclut shorts et lives).
 _CHANNEL_ROOT = re.compile(r"^https?://(www\.)?youtube\.com/(@[^/]+|channel/[^/]+|c/[^/]+)/?$")
@@ -17,6 +18,16 @@ _CHANNEL_ROOT = re.compile(r"^https?://(www\.)?youtube\.com/(@[^/]+|channel/[^/]
 
 @dataclass
 class Video:
+    """Vidéo programmable dans une grille.
+
+    Attributes:
+        id: Identifiant de la vidéo sur la plateforme.
+        title: Titre de la vidéo.
+        duration: Durée, en secondes.
+        url: URL de lecture.
+        source: Nom de la chaîne d'origine.
+    """
+
     id: str
     title: str
     duration: int  # secondes
@@ -25,12 +36,21 @@ class Video:
 
 
 def normalize_url(url: str) -> str:
+    """Redirige une URL de chaîne YouTube vers son onglet « Vidéos ».
+
+    Args:
+        url: URL de source quelconque.
+
+    Returns:
+        L'URL suivie de `/videos` si c'est la racine d'une chaîne, sinon l'URL inchangée.
+    """
     if _CHANNEL_ROOT.match(url):
         return url.rstrip("/") + "/videos"
     return url
 
 
 def _fetch(url: str, limit: int) -> list[Video]:
+    """Interroge yt-dlp en mode « flat » (liste sans ouvrir chaque vidéo)."""
     opts = {
         "extract_flat": "in_playlist",
         "playlistend": limit,
@@ -59,6 +79,20 @@ def _fetch(url: str, limit: int) -> list[Video]:
 
 
 def get_videos(url: str, limit: int, cache_dir: Path, force: bool = False) -> list[Video]:
+    """Renvoie les vidéos récentes d'une source, depuis le cache si possible.
+
+    Args:
+        url: URL de la source.
+        limit: Nombre maximal de vidéos à récupérer.
+        cache_dir: Dossier du cache.
+        force: Ignore le cache et interroge toujours la plateforme.
+
+    Returns:
+        Les vidéos ayant une durée connue, les plus récentes d'abord.
+
+    Raises:
+        yt_dlp.utils.DownloadError: Si la source est inaccessible.
+    """
     cache_dir.mkdir(parents=True, exist_ok=True)
     key = hashlib.sha1(f"{url}|{limit}".encode()).hexdigest()
     path = cache_dir / f"{key}.json"

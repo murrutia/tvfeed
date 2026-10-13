@@ -19,6 +19,7 @@ Les fonctionnalités seraient :
     - [ ] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
     - [ ] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
 - [ ] Développer une interface utilisateur
+    - [ ] Page basée sur le framework visuel shadcn/ui
     - [ ] Serveur local
     - [ ] N'effectuerait les requêtes qu'à l'ouverture de l'interface. Pas besoin de tourner en permanence en arrière plan.
     - [ ] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
@@ -42,3 +43,12 @@ uv run tvfeed shuffle [chaîne]     # remélanger une chaîne (ou toutes)
 Chaque chaîne a une graine de mélange et une ancre temporelle (`data/state.json`). La playlist tourne en boucle depuis l'ancre : le programme est donc stable entre deux lancements, et on tombe en cours de vidéo.
 
 Limite connue : quand le cache se rafraîchit et que de nouvelles vidéos apparaissent, la grille de la chaîne change.
+
+## Documentation
+
+Documentation générée avec [Zensical](https://zensical.org) ; la référence d'API vient des docstrings (style Google) via mkdocstrings.
+
+```sh
+uv run zensical serve   # aperçu sur http://localhost:8000 avec rechargement à chaud
+uv run zensical build   # site statique dans site/
+```

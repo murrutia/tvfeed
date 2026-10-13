@@ -1,3 +1,5 @@
+"""Interface en ligne de commande `tvfeed`."""
+
 import argparse
 import json
 import os
@@ -16,15 +18,18 @@ STATE = DATA / "state.json"
 
 
 def load_state() -> dict:
+    """Lit l'état des chaînes (graine et ancre) depuis `data/state.json`."""
     return json.loads(STATE.read_text()) if STATE.exists() else {}
 
 
 def save_state(state: dict) -> None:
+    """Enregistre l'état des chaînes dans `data/state.json`."""
     DATA.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(state, indent=2))
 
 
 def new_run() -> dict:
+    """Tire une nouvelle graine et place l'ancre à maintenant."""
     return {"seed": random.randrange(2**32), "anchor": datetime.now().astimezone().isoformat()}
 
 
@@ -48,12 +53,14 @@ def fetch_all(channels: list[Channel], force: bool) -> dict[str, list[Video]]:
 
 
 def fmt_duration(seconds: int) -> str:
+    """Formate une durée en `m:ss` ou `h:mm:ss`."""
     h, rest = divmod(seconds, 3600)
     m, s = divmod(rest, 60)
     return f"{h}:{m:02}:{s:02}" if h else f"{m}:{s:02}"
 
 
 def cmd_guide(args) -> None:
+    """Commande `guide` : affiche le programme de chaque chaîne."""
     channels = load_channels(CONFIG)
     if args.channel:
         channels = [c for c in channels if c.name == args.channel]
@@ -80,6 +87,7 @@ def cmd_guide(args) -> None:
 
 
 def cmd_shuffle(args) -> None:
+    """Commande `shuffle` : remélange une chaîne, ou toutes."""
     names = [c.name for c in load_channels(CONFIG)]
     targets = [args.channel] if args.channel else names
     state = load_state()
@@ -90,6 +98,7 @@ def cmd_shuffle(args) -> None:
 
 
 def main() -> None:
+    """Point d'entrée de la commande `tvfeed`."""
     parser = argparse.ArgumentParser(prog="tvfeed")
     sub = parser.add_subparsers(required=True)
 
