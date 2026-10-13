@@ -1,0 +1,8 @@
+services:
+  tvfeed:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./channels.toml:/app/channels.toml:ro
+      - ./data:/data

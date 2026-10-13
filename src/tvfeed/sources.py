@@ -26,6 +26,7 @@ class Video:
         duration: Durée, en secondes.
         url: URL de lecture.
         source: Nom de la chaîne d'origine.
+        thumbnail: URL de la vignette (vide si inconnue).
     """
 
     id: str
@@ -33,6 +34,7 @@ class Video:
     duration: int  # secondes
     url: str
     source: str
+    thumbnail: str = ""
 
 
 def normalize_url(url: str) -> str:
@@ -73,6 +75,7 @@ def _fetch(url: str, limit: int) -> list[Video]:
                 duration=int(e["duration"]),
                 url=e.get("url") or f"https://www.youtube.com/watch?v={e['id']}",
                 source=source,
+                thumbnail=e["thumbnails"][-1]["url"] if e.get("thumbnails") else "",
             )
         )
     return videos

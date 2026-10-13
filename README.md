@@ -18,27 +18,43 @@ Les fonctionnalités seraient :
     - [x] Avancer virtuellement dans la playlist. De cette manière, en choisissant une chaîne, j'arrive en cours de vidéo.
     - [ ] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
     - [ ] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
-- [ ] Développer une interface utilisateur
-    - [ ] Page basée sur le framework visuel shadcn/ui
-    - [ ] Serveur local
-    - [ ] N'effectuerait les requêtes qu'à l'ouverture de l'interface. Pas besoin de tourner en permanence en arrière plan.
-    - [ ] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
-    - [ ] Dans l'affichage du programme on aurait les vignettes des vidéos
+- [x] Développer une interface utilisateur
+    - [x] Page basée sur le framework visuel shadcn/ui
+    - [x] Serveur local
+    - [x] N'effectuerait les requêtes qu'à l'ouverture de l'interface. Pas besoin de tourner en permanence en arrière plan.
+    - [x] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
+    - [x] Dans l'affichage du programme on aurait les vignettes des vidéos
 
 ## Choix de technologie
 
 Il faudrait que je puisse le lancer avec un docker, le langage de programmation soit le plus simple possible, et que le serveur soit capable de gérer plusieurs chaînes de manière efficace. 
   
-## Étape 1 : prototype du programme télé (CLI)
+## Utilisation
 
 Les chaînes se définissent dans `channels.toml` (titre, thèmes, sources). Les vidéos sont récupérées avec [yt-dlp](https://github.com/yt-dlp/yt-dlp), sans clé d'API YouTube, et mises en cache 6 h dans `data/cache/`.
 
+### Avec Docker
+
 ```sh
-uv run tvfeed guide                # programme des 4 prochaines heures
+docker compose up --build   # interface sur http://localhost:8080
+```
+
+`channels.toml` et `data/` sont montés depuis le dossier courant.
+
+### En local
+
+```sh
+uv sync && npm --prefix web install
+npm --prefix web run build         # compile l'interface dans web/dist
+uv run tvfeed serve                # interface + API sur http://localhost:8080
+
+uv run tvfeed guide                # programme des 4 prochaines heures, en ligne de commande
 uv run tvfeed guide --hours 1 --channel Sciences
 uv run tvfeed guide --refresh      # ignorer le cache
 uv run tvfeed shuffle [chaîne]     # remélanger une chaîne (ou toutes)
 ```
+
+Pour développer l'interface avec rechargement à chaud : `uv run tvfeed serve --reload` et `npm --prefix web run dev` (Vite sur http://localhost:5173, qui redirige `/api` vers le serveur).
 
 Chaque chaîne a une graine de mélange et une ancre temporelle (`data/state.json`). La playlist tourne en boucle depuis l'ancre : le programme est donc stable entre deux lancements, et on tombe en cours de vidéo.
 

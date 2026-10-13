@@ -1,0 +1,7 @@
+.git
+.venv
+.cache
+data
+site
+web/node_modules
+web/dist
