@@ -1,0 +1,28 @@
+# Chaînes locales. Chaque chaîne regroupe plusieurs sources (chaînes YouTube, playlists...).
+# `per_source` : nombre de vidéos récentes récupérées par source (défaut : 30).
+
+[[channel]]
+name = "Sciences"
+themes = ["science", "physique", "vulgarisation"]
+sources = [
+    "https://www.youtube.com/@ScienceEtonnante",
+    "https://www.youtube.com/@ScienceClic",
+    "https://www.youtube.com/@Veritasium",
+]
+
+[[channel]]
+name = "Histoire"
+themes = ["histoire", "géopolitique"]
+sources = [
+    "https://www.youtube.com/@NotaBeneMovies",
+    "https://www.youtube.com/@LeMondeEnCartes",
+]
+
+[[channel]]
+name = "Tech"
+themes = ["informatique", "électronique"]
+per_source = 20
+sources = [
+    "https://www.youtube.com/@Micode",
+    "https://www.youtube.com/@Computerphile",
+]
