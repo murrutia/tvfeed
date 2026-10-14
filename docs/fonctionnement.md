@@ -57,6 +57,11 @@ les vidéos uniquement quand l'interface demande le programme.
 | `POST /api/channels/{nom}/shuffle`  | Remélange une chaîne, renvoie son programme   |
 | `GET /api/videos/{id}/chapters`     | Chapitres d'une vidéo (cache sans expiration) |
 | `POST /api/channels/{nom}/videos/{id}/mark` | Marque une vidéo « à revoir »         |
+| `GET /api/channels`                 | Définition des chaînes                        |
+| `POST /api/channels`                | Crée une chaîne                               |
+| `PUT /api/channels/{nom}`           | Modifie ou renomme une chaîne                 |
+| `DELETE /api/channels/{nom}`        | Supprime une chaîne                           |
+| `PUT /api/channels/order`           | Réordonne les chaînes                         |
 | `DELETE /api/later/{id}`            | Remet une vidéo marquée dans sa chaîne        |
 | `POST /api/later/{id}/done`         | Note une vidéo marquée comme vue              |
 
@@ -91,6 +96,25 @@ pour passer à la chaîne suivante.
 Un badge indique l'écart avec la grille : *En direct*, *Différé de…* ou *En avance de…*.
 À la fin d'une vidéo, le lecteur rejoint le direct, qui a pu avancer si on a fait pause ou
 reculé.
+
+## Gestion des chaînes
+
+Le panneau **Chaînes** liste les chaînes dans l'ordre de `channels.toml` ; cet ordre donne
+leur numéro, donc leur raccourci clavier. On peut en ajouter, les modifier, les supprimer
+et les réordonner.
+
+- **Écriture** : [`config`][tvfeed.config] réécrit `channels.toml` avec
+  [tomlkit](https://tomlkit.readthedocs.io), qui conserve commentaires et mise en forme.
+- **Vérification** : à l'enregistrement, les sources ajoutées sont récupérées
+  ([`check_sources`][tvfeed.guide.check_sources]). Une source illisible ou vide est refusée
+  avec un message. Les vidéos récupérées restent en cache : la chaîne est prête aussitôt.
+- **Renommage** : l'état de la chaîne (graine, ancre) et ses vidéos marquées suivent le
+  nouveau nom ; le programme ne change pas.
+- **Suppression** : l'état de la chaîne est supprimé ; ses vidéos marquées restent dans la
+  liste « à revoir ».
+
+Avec Docker, `channels.toml` est monté en lecture-écriture pour que ces modifications soient
+enregistrées dans le fichier de l'hôte.
 
 ## Vidéos à revoir (chaîne 0)
 

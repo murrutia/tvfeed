@@ -22,8 +22,8 @@ Les fonctionnalités seraient :
     - [x] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
     - [x] Dans l'affichage du programme on aurait les vignettes des vidéos
     - [ ] Interface de gestion des chaînes
-        - [ ] Listing des chaînes avec leur titre et thèmes/mots clés
-        - [ ] Ajout et suppression de chaînes
+        - [x] Listing des chaînes avec leur titre et thèmes/mots clés
+        - [x] Ajout et suppression de chaînes
         - [ ] Avec une IA locale
             - [ ] proposer des thèmes en fonction des chaînes déjà existantes
             - [ ] proposer des chaînes en fonction des thèmes existants

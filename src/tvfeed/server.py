@@ -7,9 +7,10 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
-from . import guide
-from .config import load_channels
+from . import config, guide
+from .config import DEFAULT_PER_SOURCE, Channel, load_channels
 from .schedule import Slot
 from .sources import Video, get_chapters
 
@@ -153,6 +154,74 @@ def mark_done(video_id: str, hours: float = 4) -> dict:
     except KeyError as e:
         raise HTTPException(404, f"Introuvable : {e}") from e
     return _guide(*guide.get_guide(hours))
+
+
+class ChannelIn(BaseModel):
+    """Définition d'une chaîne envoyée par l'interface."""
+
+    name: str = Field(min_length=1, max_length=60)
+    themes: list[str] = []
+    sources: list[str] = Field(min_length=1)
+    per_source: int = Field(DEFAULT_PER_SOURCE, ge=1, le=200)
+
+    def to_channel(self) -> Channel:
+        clean = lambda items: list(dict.fromkeys(i.strip() for i in items if i.strip()))
+        return Channel(self.name.strip(), clean(self.sources), clean(self.themes), self.per_source)
+
+
+class Order(BaseModel):
+    names: list[str]
+
+
+@app.get("/api/channels")
+def list_channels() -> list[dict]:
+    """Définition des chaînes, dans l'ordre de `channels.toml`."""
+    return [vars(c) for c in load_channels(guide.CONFIG)]
+
+
+def _save(channel: ChannelIn, previous_name: str | None) -> list[dict]:
+    c = channel.to_channel()
+    if not c.name or not c.sources:
+        raise HTTPException(422, "Il faut un nom et au moins une source")
+    try:
+        guide.save_channel(c, previous_name)
+    except KeyError as e:
+        raise HTTPException(404, f"Chaîne inconnue : {e}") from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return list_channels()
+
+
+@app.post("/api/channels")
+def create_channel(channel: ChannelIn) -> list[dict]:
+    """Crée une chaîne ; les sources sont vérifiées (422 si l'une est invalide)."""
+    return _save(channel, None)
+
+
+@app.put("/api/channels/order")
+def reorder_channels(order: Order) -> list[dict]:
+    """Réordonne les chaînes (liste complète des noms)."""
+    try:
+        config.reorder_channels(guide.CONFIG, order.names)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return list_channels()
+
+
+@app.put("/api/channels/{name}")
+def update_channel(name: str, channel: ChannelIn) -> list[dict]:
+    """Modifie (ou renomme) une chaîne ; seules les sources ajoutées sont vérifiées."""
+    return _save(channel, name)
+
+
+@app.delete("/api/channels/{name}")
+def delete_channel(name: str) -> list[dict]:
+    """Supprime une chaîne."""
+    try:
+        guide.delete_channel(name)
+    except KeyError as e:
+        raise HTTPException(404, f"Chaîne inconnue : {e}") from e
+    return list_channels()
 
 
 if WEB_DIST.is_dir():

@@ -4,5 +4,5 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./channels.toml:/app/channels.toml:ro
+      - ./channels.toml:/app/channels.toml
       - ./data:/data

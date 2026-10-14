@@ -12,7 +12,8 @@ export function useKeydown(handler: (e: KeyboardEvent) => void) {
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable]")) return
+      // Pas de raccourci pendant une saisie ni dans une fenêtre (gestion des chaînes…).
+      if (e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable], [role=dialog], [role=alertdialog]")) return
       ref.current(e)
     }
     window.addEventListener("keydown", listener)

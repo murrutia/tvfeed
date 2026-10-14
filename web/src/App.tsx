@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { Keyboard, Shuffle } from "lucide-react"
+import { Keyboard, Shuffle, SlidersHorizontal } from "lucide-react"
 
+import { ChannelManager } from "@/components/channel-manager"
 import { ChannelRow } from "@/components/channel-row"
 import { LaterRow } from "@/components/later-row"
 import { Player, type Source } from "@/components/player"
@@ -32,6 +33,7 @@ export default function App() {
   const [laterSelected, setLaterSelected] = useState<string | null>(null)
   // Incrémenté pour que le lecteur se recale après un changement de programme.
   const [resync, setResync] = useState(0)
+  const [managing, setManaging] = useState(false)
 
   useEffect(() => {
     history.replaceState(null, "", watching ? `#${encodeURIComponent(watching)}` : location.pathname)
@@ -66,11 +68,12 @@ export default function App() {
     }
   })
 
-  const load = useCallback(async (call: () => Promise<Guide>) => {
+  /** Charge un programme ; `partial` : la réponse ne contient que les chaînes modifiées. */
+  const load = useCallback(async (call: () => Promise<Guide>, partial = false) => {
     try {
       const next = await call()
       setGuide((prev) => {
-        if (!prev || next.channels.length === prev.channels.length) return next
+        if (!prev || !partial) return next
         // Remélange d'une seule chaîne : on remplace uniquement celle-ci.
         const updated = new Map(next.channels.map((c) => [c.name, c]))
         return { ...next, channels: prev.channels.map((c) => updated.get(c.name) ?? c) }
@@ -94,7 +97,7 @@ export default function App() {
 
   async function shuffle(name: string | null) {
     setShuffling(name ?? "*")
-    await load(name ? () => shuffleChannel(name) : shuffleAll)
+    await load(name ? () => shuffleChannel(name) : shuffleAll, name !== null)
     setShuffling(null)
     if (watching && watching !== LATER && (!name || name === watching)) setResync((r) => r + 1)
   }
@@ -169,12 +172,25 @@ export default function App() {
               </dl>
             </TooltipContent>
           </Tooltip>
+          <Button variant="outline" onClick={() => setManaging(true)}>
+            <SlidersHorizontal data-icon="inline-start" />
+            Chaînes
+          </Button>
           <Button variant="outline" onClick={() => shuffle(null)} disabled={shuffling !== null}>
             <Shuffle data-icon="inline-start" />
             Tout remélanger
           </Button>
         </div>
       </header>
+      <ChannelManager
+        open={managing}
+        onOpenChange={setManaging}
+        onChanged={({ renamed, deleted }) => {
+          if (renamed && watching === renamed[0]) setWatching(renamed[1])
+          if (deleted && watching === deleted) setWatching(null)
+          load(fetchGuide)
+        }}
+      />
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
         {error && (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">

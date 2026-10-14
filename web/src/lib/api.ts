@@ -36,9 +36,16 @@ export type Guide = {
 
 const HOURS = 4
 
+/** Lève une erreur avec le message renvoyé par l'API (`detail`) s'il y en a un. */
+async function check(res: Response) {
+  if (res.ok) return res
+  const body = await res.json().catch(() => null)
+  const detail = body?.detail
+  throw new Error(typeof detail === "string" ? detail : `${res.status} ${res.statusText}`)
+}
+
 async function request(method: string, path: string): Promise<Guide> {
-  const res = await fetch(`/api${path}?hours=${HOURS}`, { method })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  const res = await check(await fetch(`/api${path}?hours=${HOURS}`, { method }))
   return res.json()
 }
 
@@ -67,3 +74,29 @@ export async function fetchChapters(videoId: string, signal?: AbortSignal): Prom
 export function liveSlot(channel: ChannelGuide, now: Date): Slot | undefined {
   return channel.slots.find((s) => new Date(s.start) <= now && now < new Date(s.end))
 }
+
+/** Définition d'une chaîne (contenu de `channels.toml`). */
+export type ChannelDef = {
+  name: string
+  themes: string[]
+  sources: string[]
+  per_source: number
+}
+
+async function channelsRequest(method: string, path: string, body?: unknown): Promise<ChannelDef[]> {
+  const res = await check(
+    await fetch(`/api/channels${path}`, {
+      method,
+      headers: body ? { "content-type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  )
+  return res.json()
+}
+
+export const listChannels = () => channelsRequest("GET", "")
+export const createChannel = (channel: ChannelDef) => channelsRequest("POST", "", channel)
+export const updateChannel = (name: string, channel: ChannelDef) =>
+  channelsRequest("PUT", `/${encodeURIComponent(name)}`, channel)
+export const deleteChannel = (name: string) => channelsRequest("DELETE", `/${encodeURIComponent(name)}`)
+export const reorderChannels = (names: string[]) => channelsRequest("PUT", "/order", { names })

@@ -23,8 +23,10 @@ avec une grille horaire comme à la télé.
 
 ## Définir ses chaînes
 
-Les chaînes se définissent dans `channels.toml`. Chaque chaîne regroupe plusieurs sources
-(chaînes YouTube, playlists…) :
+Les chaînes se gèrent depuis l'interface (bouton **Chaînes** en haut de la page) : ajout,
+modification, suppression et ordre. Elles sont enregistrées dans `channels.toml`, qu'on peut
+aussi modifier à la main ; ses commentaires et sa mise en forme sont conservés. Chaque chaîne
+regroupe plusieurs sources (chaînes YouTube, playlists…) :
 
 ```toml
 [[channel]]

@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from . import config
 from .config import Channel, load_channels
 from .schedule import Slot, anchor_at, build_playlist, build_schedule, position
 from .sources import Video, get_videos
@@ -255,3 +256,75 @@ def mark_done(video_id: str) -> None:
         raise KeyError(video_id)
     marked.done = True
     save_later(later)
+
+
+def check_sources(urls: list[str], per_source: int) -> None:
+    """Vérifie que des sources sont lisibles et contiennent des vidéos.
+
+    Les vidéos récupérées restent en cache : la chaîne est ensuite prête tout de suite.
+
+    Args:
+        urls: Sources à vérifier.
+        per_source: Nombre de vidéos à récupérer par source.
+
+    Raises:
+        ValueError: Pour la première source inaccessible ou sans vidéo.
+    """
+
+    def check(url: str) -> str | None:
+        try:
+            if not get_videos(url, per_source, DATA / "cache"):
+                return f"{url} : aucune vidéo trouvée"
+        except Exception as e:
+            # Messages yt-dlp : « ERROR: [youtube:tab] x: ... (caused by ...) », trop bavards.
+            message = str(e).split(" (caused by")[0].removeprefix("ERROR: ")
+            return f"{url} : source illisible ({message.rsplit(': ', 1)[-1]})"
+        return None
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        errors = [e for e in pool.map(check, urls) if e]
+    if errors:
+        raise ValueError(errors[0])
+
+
+def save_channel(channel: Channel, previous_name: str | None = None) -> None:
+    """Crée ou modifie une chaîne, après vérification des sources ajoutées.
+
+    En cas de renommage, l'état de la chaîne (graine, ancre) et ses vidéos marquées
+    suivent le nouveau nom : le programme ne change pas.
+
+    Args:
+        channel: Nouvelle définition de la chaîne.
+        previous_name: Nom actuel de la chaîne à modifier ; création si absent.
+
+    Raises:
+        KeyError: Si `previous_name` ne correspond à aucune chaîne.
+        ValueError: Si le nom est déjà pris ou si une source ajoutée est invalide.
+    """
+    old = _channel(previous_name) if previous_name else None
+    known = set(old.sources) if old and old.per_source == channel.per_source else set()
+    check_sources([u for u in channel.sources if u not in known], channel.per_source)
+    config.upsert_channel(CONFIG, channel, previous_name)
+
+    if previous_name and previous_name != channel.name:
+        state = load_state()
+        if previous_name in state:
+            state[channel.name] = state.pop(previous_name)
+            save_state(state)
+        later = load_later()
+        for m in later:
+            if m.channel == previous_name:
+                m.channel = channel.name
+        save_later(later)
+
+
+def delete_channel(name: str) -> None:
+    """Supprime une chaîne et son état. Ses vidéos marquées restent dans la liste.
+
+    Raises:
+        KeyError: Si la chaîne n'existe pas.
+    """
+    config.delete_channel(CONFIG, name)
+    state = load_state()
+    if state.pop(name, None) is not None:
+        save_state(state)
