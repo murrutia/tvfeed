@@ -50,7 +50,7 @@ uv run tvfeed shuffle [chaîne]     # remélanger une chaîne (ou toutes)
 | Variable d'environnement | Défaut          | Rôle                                  |
 | ------------------------ | --------------- | ------------------------------------- |
 | `TVFEED_CONFIG`          | `channels.toml` | Fichier de définition des chaînes     |
-| `TVFEED_DATA`            | `data`          | Dossier du cache et de l'état         |
+| `TVFEED_DATA`            | `data`          | Dossier du cache, de l'état et des vidéos à revoir |
 | `TVFEED_WEB`             | `web/dist`      | Interface compilée servie sur `/`     |
 
 ## Développer l'interface

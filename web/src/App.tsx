@@ -2,19 +2,23 @@ import { useCallback, useEffect, useState } from "react"
 import { Keyboard, Shuffle } from "lucide-react"
 
 import { ChannelRow } from "@/components/channel-row"
-import { Player } from "@/components/player"
+import { LaterRow } from "@/components/later-row"
+import { Player, type Source } from "@/components/player"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Kbd } from "@/components/ui/kbd"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { fetchGuide, shuffleAll, shuffleChannel, type Guide } from "@/lib/api"
+import { fetchGuide, markDone, markVideo, shuffleAll, shuffleChannel, unmarkVideo, type Guide } from "@/lib/api"
 import { formatTime } from "@/lib/format"
 import { SHORTCUTS, useKeydown } from "@/lib/keyboard"
 
 // Le serveur ne travaille qu'à la demande : on recharge le programme de temps en
 // temps pour qu'il couvre toujours les heures à venir.
 const REFRESH_MS = 15 * 60 * 1000
+
+/** Identifiant de la chaîne 0 (« à revoir ») dans l'URL et la navigation. */
+const LATER = "a-revoir"
 
 export default function App() {
   const [guide, setGuide] = useState<Guide | null>(null)
@@ -24,6 +28,10 @@ export default function App() {
   const [shuffling, setShuffling] = useState<string | null>(null)
   // Chaîne regardée, conservée dans l'URL (#Sciences) pour survivre à un rechargement.
   const [watching, setWatching] = useState(() => decodeURIComponent(location.hash.slice(1)) || null)
+  // Vidéo choisie dans la liste « à revoir ».
+  const [laterSelected, setLaterSelected] = useState<string | null>(null)
+  // Incrémenté pour que le lecteur se recale après un changement de programme.
+  const [resync, setResync] = useState(0)
 
   useEffect(() => {
     history.replaceState(null, "", watching ? `#${encodeURIComponent(watching)}` : location.pathname)
@@ -36,7 +44,7 @@ export default function App() {
 
   function zap(delta: 1 | -1) {
     if (!guide || !watching) return
-    const names = guide.channels.map((c) => c.name)
+    const names = [...(guide.later.length ? [LATER] : []), ...guide.channels.map((c) => c.name)]
     const i = names.indexOf(watching)
     setWatching(names[(i + delta + names.length) % names.length])
   }
@@ -45,7 +53,9 @@ export default function App() {
 
   useKeydown((e) => {
     if (!guide) return
-    if (/^[1-9]$/.test(e.key)) {
+    if (e.key === "0") {
+      if (guide.later.length) watchLater(null)
+    } else if (/^[1-9]$/.test(e.key)) {
       const channel = guide.channels[Number(e.key) - 1]
       if (channel) watch(channel.name)
     } else if (watching && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -63,9 +73,10 @@ export default function App() {
         if (!prev || next.channels.length === prev.channels.length) return next
         // Remélange d'une seule chaîne : on remplace uniquement celle-ci.
         const updated = new Map(next.channels.map((c) => [c.name, c]))
-        return { ...prev, channels: prev.channels.map((c) => updated.get(c.name) ?? c) }
+        return { ...next, channels: prev.channels.map((c) => updated.get(c.name) ?? c) }
       })
       setError(null)
+      return next
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -85,6 +96,50 @@ export default function App() {
     setShuffling(name ?? "*")
     await load(name ? () => shuffleChannel(name) : shuffleAll)
     setShuffling(null)
+    if (watching && watching !== LATER && (!name || name === watching)) setResync((r) => r + 1)
+  }
+
+  function watchLater(videoId: string | null) {
+    setLaterSelected(videoId)
+    setResync((r) => r + 1)
+    watch(LATER)
+  }
+
+  /** Retire une vidéo de la liste (vue ou remise dans sa chaîne) et passe à la suivante. */
+  async function leaveLater(videoId: string, call: (id: string) => Promise<Guide>) {
+    const list = guide?.later ?? []
+    const i = list.findIndex((v) => v.id === videoId)
+    const following = list[i + 1] ?? list[i - 1]
+    const next = await load(() => call(videoId))
+    if (watching !== LATER) return
+    if (!next?.later.length) setWatching(null)
+    else if ((laterSelected ?? list[0]?.id) === videoId) {
+      // C'était la vidéo en cours de lecture : on enchaîne sur la suivante.
+      setLaterSelected(following?.id ?? null)
+      setResync((r) => r + 1)
+    }
+  }
+
+  let source: Source | null = null
+  if (watched) {
+    source = {
+      kind: "channel",
+      channel: watched,
+      onMark: async (videoId) => {
+        // La vidéo quitte la chaîne et la suivante démarre : on se recale sur le direct.
+        await load(() => markVideo(watched.name, videoId))
+        setResync((r) => r + 1)
+      },
+    }
+  } else if (watching === LATER && guide?.later.length) {
+    source = {
+      kind: "later",
+      videos: guide.later,
+      selected: laterSelected,
+      onSelect: (videoId) => watchLater(videoId),
+      onDone: (videoId) => leaveLater(videoId, markDone),
+      onRemove: (videoId) => leaveLater(videoId, unmarkVideo),
+    }
   }
 
   return (
@@ -126,7 +181,10 @@ export default function App() {
             Impossible de charger le programme : {error}
           </p>
         )}
-        {watched && <Player channel={watched} now={now} onZap={zap} onClose={() => setWatching(null)} />}
+        {source && <Player source={source} now={now} resync={resync} onZap={zap} onClose={() => setWatching(null)} />}
+        {guide && guide.later.length > 0 && (
+          <LaterRow videos={guide.later} onWatch={watchLater} onRemove={(id) => leaveLater(id, unmarkVideo)} />
+        )}
         {guide
           ? guide.channels.map((c, i) => (
               <ChannelRow

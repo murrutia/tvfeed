@@ -23,6 +23,7 @@ export function useKeydown(handler: (e: KeyboardEvent) => void) {
 /** Raccourcis, affichés dans l'aide. */
 export const SHORTCUTS = [
   { keys: ["↑", "↓"], label: "Chaîne précédente / suivante" },
+  { keys: ["0"], label: "Vidéos à revoir" },
   { keys: ["1…9"], label: "Aller à la chaîne n" },
   { keys: ["Échap"], label: "Fermer le lecteur" },
   { keys: ["Espace"], label: "Lecture / pause" },
@@ -30,4 +31,5 @@ export const SHORTCUTS = [
   { keys: ["⇧ ←", "⇧ →"], label: "Chapitre précédent / suivant" },
   { keys: ["Début"], label: "Revenir au début" },
   { keys: ["D"], label: "Retour au direct" },
+  { keys: ["M"], label: "Marquer à revoir (sort la vidéo de la chaîne)" },
 ]

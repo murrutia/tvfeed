@@ -7,12 +7,12 @@ import json
 import os
 import random
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
 from .config import Channel, load_channels
-from .schedule import Slot, build_playlist, build_schedule
+from .schedule import Slot, anchor_at, build_playlist, build_schedule, position
 from .sources import Video, get_videos
 
 CONFIG = Path(os.environ.get("TVFEED_CONFIG", "channels.toml"))
@@ -20,6 +20,7 @@ CONFIG = Path(os.environ.get("TVFEED_CONFIG", "channels.toml"))
 DATA = Path(os.environ.get("TVFEED_DATA", "data"))
 """Dossier du cache et de l'état (variable `TVFEED_DATA`)."""
 STATE = DATA / "state.json"
+LATER = DATA / "later.json"
 
 
 @dataclass
@@ -35,6 +36,37 @@ class ChannelGuide:
     channel: Channel
     video_count: int
     slots: list[Slot]
+
+
+@dataclass
+class Marked:
+    """Vidéo marquée « à revoir ».
+
+    Attributes:
+        video: Vidéo marquée.
+        channel: Chaîne d'où elle a été retirée.
+        marked_at: Instant du marquage (ISO 8601).
+        done: Vue jusqu'au bout depuis la liste : elle n'y apparaît plus, et ne
+            revient pas non plus dans sa chaîne.
+    """
+
+    video: Video
+    channel: str
+    marked_at: str
+    done: bool = False
+
+
+def load_later() -> list[Marked]:
+    """Lit les vidéos marquées depuis `data/later.json`, dans l'ordre de marquage."""
+    if not LATER.exists():
+        return []
+    return [Marked(**{**m, "video": Video(**m["video"])}) for m in json.loads(LATER.read_text())]
+
+
+def save_later(later: list[Marked]) -> None:
+    """Enregistre les vidéos marquées dans `data/later.json`."""
+    DATA.mkdir(parents=True, exist_ok=True)
+    LATER.write_text(json.dumps([asdict(m) for m in later], indent=2, ensure_ascii=False))
 
 
 def load_state() -> dict:
@@ -104,11 +136,12 @@ def get_guide(
     save_state(state)
 
     videos = fetch_all(channels, refresh)
+    exclude = {m.video.id for m in load_later()}
     now = datetime.now().astimezone()
     guides = []
     for c in channels:
         run = state[c.name]
-        playlist = build_playlist(videos[c.name], run["seed"])
+        playlist = build_playlist(videos[c.name], run["seed"], exclude)
         slots = build_schedule(playlist, datetime.fromisoformat(run["anchor"]), now, hours)
         guides.append(ChannelGuide(c, len(playlist), slots))
     return now, guides
@@ -130,3 +163,95 @@ def shuffle(channel: str | None = None) -> list[str]:
         state[name] = new_run()
     save_state(state)
     return targets
+
+
+def _channel(name: str) -> Channel:
+    for c in load_channels(CONFIG):
+        if c.name == name:
+            return c
+    raise KeyError(name)
+
+
+def mark(channel: str, video_id: str) -> None:
+    """Marque une vidéo « à revoir » : elle quitte sa chaîne, et la suivante démarre.
+
+    L'ancre de la chaîne est recalée pour que la vidéo qui suivait la vidéo marquée
+    commence maintenant ; le reste de la grille garde son ordre.
+
+    Args:
+        channel: Chaîne où passe la vidéo.
+        video_id: Vidéo à marquer.
+
+    Raises:
+        KeyError: Si la chaîne n'existe pas ou si la vidéo n'est pas dans sa playlist.
+    """
+    c = _channel(channel)
+    state, later = load_state(), load_later()
+    exclude = {m.video.id for m in later}
+    playlist = build_playlist(fetch_all([c], False)[c.name], state[c.name]["seed"], exclude)
+    index = next((i for i, v in enumerate(playlist) if v.id == video_id), None)
+    if index is None:
+        raise KeyError(video_id)
+
+    now = datetime.now().astimezone()
+    video = playlist.pop(index)
+    later.append(Marked(video, c.name, now.isoformat()))
+    if playlist:
+        # La vidéo suivante a pris la place de la vidéo marquée, au même indice.
+        state[c.name]["anchor"] = anchor_at(playlist, index % len(playlist), 0, now).isoformat()
+    save_later(later)
+    save_state(state)
+
+
+def unmark(video_id: str) -> None:
+    """Retire une vidéo de la liste « à revoir » et la remet dans sa chaîne.
+
+    La vidéo en cours sur cette chaîne reste à l'antenne, à la même position.
+
+    Args:
+        video_id: Vidéo à retirer de la liste.
+
+    Raises:
+        KeyError: Si la vidéo n'est pas dans la liste.
+    """
+    later = load_later()
+    marked = next((m for m in later if m.video.id == video_id), None)
+    if marked is None:
+        raise KeyError(video_id)
+    later.remove(marked)
+
+    state = load_state()
+    try:
+        c = _channel(marked.channel)
+    except KeyError:
+        c = None  # Chaîne supprimée depuis : rien à recaler.
+    if c and c.name in state:
+        videos = fetch_all([c], False)[c.name]
+        seed = state[c.name]["seed"]
+        now = datetime.now().astimezone()
+        before = build_playlist(videos, seed, {m.video.id for m in later} | {video_id})
+        after = build_playlist(videos, seed, {m.video.id for m in later})
+        if before:
+            i, offset = position(before, datetime.fromisoformat(state[c.name]["anchor"]), now)
+            current = before[i].id
+            index = next(j for j, v in enumerate(after) if v.id == current)
+            state[c.name]["anchor"] = anchor_at(after, index, offset, now).isoformat()
+            save_state(state)
+    save_later(later)
+
+
+def mark_done(video_id: str) -> None:
+    """Note une vidéo de la liste « à revoir » comme vue : elle n'y apparaît plus.
+
+    Args:
+        video_id: Vidéo vue.
+
+    Raises:
+        KeyError: Si la vidéo n'est pas dans la liste.
+    """
+    later = load_later()
+    marked = next((m for m in later if m.video.id == video_id), None)
+    if marked is None:
+        raise KeyError(video_id)
+    marked.done = True
+    save_later(later)

@@ -9,12 +9,12 @@ Les fonctionnalités seraient :
     - [x] Définir le titre
     - [x] Définir les thèmes
     - [x] Rajouter des chaînes YouTube (ou autre plateforme vidéo)
- - [ ] Création de programme/sommaire télé
+ - [x] Création de programme/sommaire télé
     - [x] Pour chaque chaîne, créer une playlist pour les quelques heures à venir (disons 4)
     - [x] Pouvoir afficher, de par la durée des vidéos, à quelle heure commenceront les prochaines vidéos
     - [x] Avancer virtuellement dans la playlist. De cette manière, en choisissant une chaîne, j'arrive en cours de vidéo.
     - [x] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
-    - [ ] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
+    - [x] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
 - [x] Développer une interface utilisateur
     - [x] Page basée sur le framework visuel shadcn/ui
     - [x] Serveur local
@@ -31,6 +31,7 @@ Les fonctionnalités seraient :
     - [x] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
 - [ ] Contrôle depuis une "télécommande"
     - [ ] Déterminer la faisabilité de contrôler l'ordi avec une manette PS3 ou une app Android
+- [ ] Proposer un mode kiosque pour être lancé sur un Raspberry Pi
 
 ## Choix de technologie
 

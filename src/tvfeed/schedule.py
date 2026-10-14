@@ -28,12 +28,13 @@ class Slot:
     end: datetime
 
 
-def build_playlist(videos: list[Video], seed: int) -> list[Video]:
+def build_playlist(videos: list[Video], seed: int, exclude: set[str] = frozenset()) -> list[Video]:
     """Mélange les vidéos d'une chaîne de façon reproductible.
 
     Args:
         videos: Vidéos de toutes les sources de la chaîne, doublons possibles.
         seed: Graine du mélange.
+        exclude: Identifiants des vidéos à retirer (vidéos marquées).
 
     Returns:
         Les vidéos sans doublon, dans un ordre qui ne dépend que de `seed`.
@@ -41,7 +42,46 @@ def build_playlist(videos: list[Video], seed: int) -> list[Video]:
     # Dédoublonnage + tri pour que le mélange ne dépende que de la graine.
     unique = sorted({v.id: v for v in videos}.values(), key=lambda v: v.id)
     random.Random(seed).shuffle(unique)
-    return unique
+    # Filtrage après le mélange : retirer une vidéo ne change pas l'ordre des autres.
+    return [v for v in unique if v.id not in exclude]
+
+
+def position(playlist: list[Video], anchor: datetime, now: datetime) -> tuple[int, int]:
+    """Situe l'instant `now` dans la playlist jouée en boucle depuis `anchor`.
+
+    Args:
+        playlist: Playlist de la chaîne, non vide.
+        anchor: Instant où la playlist a démarré.
+        now: Instant courant.
+
+    Returns:
+        L'indice de la vidéo en cours et la position dans cette vidéo, en secondes.
+    """
+    total = sum(v.duration for v in playlist)
+    elapsed = int((now - anchor).total_seconds()) % total
+    i = 0
+    while elapsed >= playlist[i].duration:
+        elapsed -= playlist[i].duration
+        i += 1
+    return i, elapsed
+
+
+def anchor_at(playlist: list[Video], index: int, offset: float, now: datetime) -> datetime:
+    """Ancre telle que la vidéo `index` soit à la position `offset` à l'instant `now`.
+
+    Sert à modifier une playlist sans faire sauter ce qui passe à l'antenne.
+
+    Args:
+        playlist: Playlist de la chaîne.
+        index: Indice de la vidéo qui doit être en cours.
+        offset: Position voulue dans cette vidéo, en secondes.
+        now: Instant courant.
+
+    Returns:
+        La nouvelle ancre.
+    """
+    before = sum(v.duration for v in playlist[:index])
+    return now - timedelta(seconds=before + offset)
 
 
 def build_schedule(
@@ -62,15 +102,8 @@ def build_schedule(
     """
     if not playlist:
         return []
-    total = sum(v.duration for v in playlist)
-    elapsed = int((now - anchor).total_seconds()) % total
-
-    # Vidéo en cours et instant où elle a commencé.
-    i, offset = 0, 0
-    while offset + playlist[i].duration <= elapsed:
-        offset += playlist[i].duration
-        i += 1
-    start = now - timedelta(seconds=elapsed - offset)
+    i, offset = position(playlist, anchor, now)
+    start = now - timedelta(seconds=offset)
 
     limit = now + timedelta(hours=hours)
     slots = []

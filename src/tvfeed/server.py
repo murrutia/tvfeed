@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from . import guide
 from .config import load_channels
 from .schedule import Slot
-from .sources import get_chapters
+from .sources import Video, get_chapters
 
 WEB_DIST = Path(os.environ.get("TVFEED_WEB", "web/dist"))
 """Dossier de l'interface compilée (variable `TVFEED_WEB`)."""
@@ -19,8 +19,10 @@ WEB_DIST = Path(os.environ.get("TVFEED_WEB", "web/dist"))
 app = FastAPI(title="tvfeed")
 
 
-def _slot(slot: Slot) -> dict:
-    v = slot.video
+VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+
+
+def _video(v: Video) -> dict:
     return {
         "id": v.id,
         "title": v.title,
@@ -28,9 +30,16 @@ def _slot(slot: Slot) -> dict:
         "url": v.url,
         "thumbnail": v.thumbnail or f"https://i.ytimg.com/vi/{v.id}/mqdefault.jpg",
         "duration": v.duration,
-        "start": slot.start.isoformat(),
-        "end": slot.end.isoformat(),
     }
+
+
+def _slot(slot: Slot) -> dict:
+    return {**_video(slot.video), "start": slot.start.isoformat(), "end": slot.end.isoformat()}
+
+
+def _check_id(video_id: str) -> None:
+    if not VIDEO_ID.fullmatch(video_id):
+        raise HTTPException(400, "Identifiant de vidéo invalide")
 
 
 def _guide(now: datetime, guides: list[guide.ChannelGuide]) -> dict:
@@ -44,6 +53,11 @@ def _guide(now: datetime, guides: list[guide.ChannelGuide]) -> dict:
                 "slots": [_slot(s) for s in g.slots],
             }
             for g in guides
+        ],
+        "later": [
+            {**_video(m.video), "channel": m.channel, "marked_at": m.marked_at}
+            for m in guide.load_later()
+            if not m.done
         ],
     }
 
@@ -89,12 +103,56 @@ def chapters(video_id: str) -> list[dict]:
         HTTPException: 400 si l'identifiant est invalide, 502 si YouTube ne répond pas.
     """
     # L'identifiant sert de nom de fichier dans le cache : on le valide strictement.
-    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
-        raise HTTPException(400, "Identifiant de vidéo invalide")
+    _check_id(video_id)
     try:
         return [vars(c) for c in get_chapters(video_id, guide.DATA / "cache")]
     except Exception as e:
         raise HTTPException(502, f"Chapitres indisponibles : {e}") from e
+
+
+@app.post("/api/channels/{name}/videos/{video_id}/mark")
+def mark(name: str, video_id: str, hours: float = 4) -> dict:
+    """Marque une vidéo « à revoir » : elle quitte sa chaîne et la suivante démarre.
+
+    Raises:
+        HTTPException: 404 si la chaîne ou la vidéo est inconnue.
+    """
+    _check_id(video_id)
+    try:
+        guide.mark(name, video_id)
+    except KeyError as e:
+        raise HTTPException(404, f"Introuvable : {e}") from e
+    return _guide(*guide.get_guide(hours))
+
+
+@app.delete("/api/later/{video_id}")
+def unmark(video_id: str, hours: float = 4) -> dict:
+    """Retire une vidéo de la liste « à revoir » et la remet dans sa chaîne.
+
+    Raises:
+        HTTPException: 404 si la vidéo n'est pas dans la liste.
+    """
+    _check_id(video_id)
+    try:
+        guide.unmark(video_id)
+    except KeyError as e:
+        raise HTTPException(404, f"Introuvable : {e}") from e
+    return _guide(*guide.get_guide(hours))
+
+
+@app.post("/api/later/{video_id}/done")
+def mark_done(video_id: str, hours: float = 4) -> dict:
+    """Note une vidéo de la liste « à revoir » comme vue.
+
+    Raises:
+        HTTPException: 404 si la vidéo n'est pas dans la liste.
+    """
+    _check_id(video_id)
+    try:
+        guide.mark_done(video_id)
+    except KeyError as e:
+        raise HTTPException(404, f"Introuvable : {e}") from e
+    return _guide(*guide.get_guide(hours))
 
 
 if WEB_DIST.is_dir():

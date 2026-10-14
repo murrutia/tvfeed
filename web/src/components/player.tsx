@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  BookmarkMinus,
+  BookmarkPlus,
+  Check,
   ChevronDown,
+  ChevronsRight,
   ChevronUp,
   ExternalLink,
   ListVideo,
@@ -19,7 +23,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { fetchChapters, liveSlot, type ChannelGuide, type Chapter, type Slot } from "@/lib/api"
+import { fetchChapters, liveSlot, type ChannelGuide, type Chapter, type LaterVideo, type Slot, type Video } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { formatDuration, formatTime } from "@/lib/format"
 import { useKeydown } from "@/lib/keyboard"
@@ -35,17 +39,35 @@ const ERROR_MESSAGES: Record<number, string> = {
 // En deçà de cet écart avec la grille, on considère qu'on regarde « en direct ».
 const LIVE_TOLERANCE = 5
 
+/** Ce que lit le lecteur : une chaîne calée sur la grille, ou la liste « à revoir ». */
+export type Source =
+  | { kind: "channel"; channel: ChannelGuide; onMark: (videoId: string) => void }
+  | {
+      kind: "later"
+      videos: LaterVideo[]
+      /** Vidéo choisie dans la liste ; la première si absente. */
+      selected: string | null
+      onSelect: (videoId: string) => void
+      onDone: (videoId: string) => void
+      onRemove: (videoId: string) => void
+    }
+
 type Props = {
-  channel: ChannelGuide
+  source: Source
   now: Date
+  /** Incrémenté par la page pour forcer le lecteur à se recaler (après un marquage, un remélange…). */
+  resync: number
   onZap: (delta: 1 | -1) => void
   onClose: () => void
 }
 
-/** Vidéo demandée au lecteur ; `key` force le rechargement d'une même vidéo. */
-type Request = { slot: Slot; start: number; key: number }
+/**
+ * Vidéo demandée au lecteur ; `slot` est le créneau de la grille quand on regarde une
+ * chaîne. `key` force le rechargement d'une même vidéo.
+ */
+type Request = { video: Video; slot?: Slot; start: number; key: number }
 
-export function Player({ channel, now, onZap, onClose }: Props) {
+export function Player({ source, now, resync, onZap, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const [ready, setReady] = useState(false)
@@ -53,23 +75,39 @@ export function Player({ channel, now, onZap, onClose }: Props) {
   const [time, setTime] = useState(0)
   // Clé de la dernière demande dont la lecture a réellement démarré : tant que la
   // vidéo charge, sa position (0) ne dit rien de l'écart avec le direct.
-  const requestKey = useRef<number | null>(null)
+  const requestRef = useRef<Request | null>(null)
   const [startedKey, setStartedKey] = useState<number | null>(null)
   const [error, setError] = useState<{ key: number | null; code: number } | null>(null)
   const pendingSeek = useRef<{ time: number; until: number } | null>(null)
   // Chapitres associés à leur vidéo, pour ignorer ceux de la vidéo précédente.
   const [loaded, setLoaded] = useState<{ videoId: string; chapters: Chapter[] } | null>(null)
 
-  // Comme à la télé : on rejoint la grille là où elle en est.
-  const channelRef = useRef(channel)
+  const sourceRef = useRef(source)
   useEffect(() => {
-    channelRef.current = channel
+    sourceRef.current = source
   })
-  const goLive = useCallback(() => {
+
+  // Chaîne : comme à la télé, on rejoint la grille là où elle en est.
+  // Liste « à revoir » : la vidéo choisie, depuis le début.
+  const tune = useCallback(() => {
+    const src = sourceRef.current
     const at = new Date()
-    const slot = liveSlot(channelRef.current, at)
-    if (slot) setRequest({ slot, start: (at.getTime() - new Date(slot.start).getTime()) / 1000, key: at.getTime() })
+    if (src.kind === "channel") {
+      const slot = liveSlot(src.channel, at)
+      if (slot) setRequest({ video: slot, slot, start: (at.getTime() - new Date(slot.start).getTime()) / 1000, key: at.getTime() })
+    } else {
+      const video = src.videos.find((v) => v.id === src.selected) ?? src.videos[0]
+      if (video) setRequest({ video, start: 0, key: at.getTime() })
+    }
   }, [])
+
+  const onEnded = useCallback(() => {
+    const src = sourceRef.current
+    // Liste : la vidéo est vue, la page passe à la suivante. Chaîne : retour au direct,
+    // qui a pu avancer si on a fait pause ou reculé.
+    if (src.kind === "later" && requestRef.current) src.onDone(requestRef.current.video.id)
+    else tune()
+  }, [tune])
 
   // Création du lecteur, une seule fois. L'API remplace l'élément cible par une
   // iframe : on lui donne un élément créé à la main pour ne pas gêner React.
@@ -88,14 +126,13 @@ export function Player({ channel, now, onZap, onClose }: Props) {
             playerRef.current = player!
             setReady(true)
           },
-          // Fin de la vidéo : on revient au direct, qui a pu avancer entre-temps.
           onStateChange: (e) => {
-            if (e.data === yt.PlayerState.ENDED) goLive()
+            if (e.data === yt.PlayerState.ENDED) onEnded()
             else if (e.data === yt.PlayerState.PLAYING || e.data === yt.PlayerState.PAUSED) {
-              setStartedKey(requestKey.current)
+              setStartedKey(requestRef.current?.key ?? null)
             }
           },
-          onError: (e) => setError({ key: requestKey.current, code: e.data }),
+          onError: (e) => setError({ key: requestRef.current?.key ?? null, code: e.data }),
         },
       })
     })
@@ -105,7 +142,7 @@ export function Player({ channel, now, onZap, onClose }: Props) {
       playerRef.current = null
       container.replaceChildren()
     }
-  }, [goLive])
+  }, [onEnded])
 
   // Un clic dans l'iframe YouTube lui donne le focus clavier, et nos raccourcis ne
   // reçoivent plus rien : on rend le focus à la page.
@@ -118,13 +155,14 @@ export function Player({ channel, now, onZap, onClose }: Props) {
     return () => window.removeEventListener("blur", onBlur)
   }, [])
 
-  // Changement de chaîne : on se cale sur le direct.
-  useEffect(goLive, [channel.name, goLive])
+  // Changement de chaîne ou recalage demandé par la page.
+  const sourceKey = source.kind === "channel" ? source.channel.name : "later"
+  useEffect(tune, [sourceKey, resync, tune])
 
   useEffect(() => {
     if (ready && request) {
-      requestKey.current = request.key
-      playerRef.current?.loadVideoById({ videoId: request.slot.id, startSeconds: Math.floor(request.start) })
+      requestRef.current = request
+      playerRef.current?.loadVideoById({ videoId: request.video.id, startSeconds: Math.floor(request.start) })
     }
   }, [ready, request])
 
@@ -143,7 +181,7 @@ export function Player({ channel, now, onZap, onClose }: Props) {
     return () => clearInterval(id)
   }, [ready])
 
-  const videoId = request?.slot.id
+  const videoId = request?.video.id
   useEffect(() => {
     if (!videoId) return
     const abort = new AbortController()
@@ -187,7 +225,10 @@ export function Player({ channel, now, onZap, onClose }: Props) {
       ArrowLeft: e.shiftKey ? prevChapter : () => seek(time - 10),
       ArrowRight: e.shiftKey ? nextChapter : () => seek(time + 30),
       Home: () => seek(0),
-      d: goLive,
+      ...(source.kind === "channel" && {
+        d: tune,
+        m: () => request && source.onMark(request.video.id),
+      }),
     }
     const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key]
     if (!action || !ready) return
@@ -196,7 +237,8 @@ export function Player({ channel, now, onZap, onClose }: Props) {
     action()
   })
 
-  const live = liveSlot(channel, now)
+  const live = source.kind === "channel" ? liveSlot(source.channel, now) : undefined
+  const video = request?.video
   const slot = request?.slot
   const isLiveVideo = !!slot && !!live && slot.id === live.id && slot.start === live.start
   const delay = isLiveVideo ? (now.getTime() - new Date(live.start).getTime()) / 1000 - time : null
@@ -204,7 +246,10 @@ export function Player({ channel, now, onZap, onClose }: Props) {
   const started = !!request && startedKey === request.key
   const errorMessage = request && error?.key === request.key ? (ERROR_MESSAGES[error.code] ?? "Lecture impossible.") : null
   // Lien de secours : la vidéo sur YouTube, à l'instant prévu par la grille.
-  const youtubeUrl = slot && `https://www.youtube.com/watch?v=${slot.id}&t=${Math.floor(isLiveVideo ? (now.getTime() - new Date(slot.start).getTime()) / 1000 : request!.start)}s`
+  const youtubeUrl =
+    video &&
+    `https://www.youtube.com/watch?v=${video.id}&t=${Math.floor(slot && isLiveVideo ? (now.getTime() - new Date(slot.start).getTime()) / 1000 : request!.start)}s`
+  const laterIndex = source.kind === "later" && video ? source.videos.findIndex((v) => v.id === video.id) : -1
 
   return (
     <Card className="py-0">
@@ -236,8 +281,19 @@ export function Player({ channel, now, onZap, onClose }: Props) {
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{channel.name}</span>
-                  {errorMessage ? (
+                  <span className="font-medium text-foreground">
+                    {source.kind === "channel" ? source.channel.name : "À revoir"}
+                  </span>
+                  {source.kind === "later" ? (
+                    <>
+                      {laterIndex >= 0 && (
+                        <Badge variant="outline" className="tabular-nums">
+                          {laterIndex + 1} / {source.videos.length}
+                        </Badge>
+                      )}
+                      {laterIndex >= 0 && <span>depuis {source.videos[laterIndex].channel}</span>}
+                    </>
+                  ) : errorMessage ? (
                     <Badge variant="outline">Indisponible</Badge>
                   ) : !started ? (
                     <Badge variant="outline">Chargement…</Badge>
@@ -261,8 +317,8 @@ export function Player({ channel, now, onZap, onClose }: Props) {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 line-clamp-2 text-lg font-medium leading-snug">{slot?.title ?? "Chargement…"}</p>
-                <p className="text-sm text-muted-foreground">{slot?.source}</p>
+                <p className="mt-1 line-clamp-2 text-lg font-medium leading-snug">{video?.title ?? "Chargement…"}</p>
+                <p className="text-sm text-muted-foreground">{video?.source}</p>
               </div>
               <Control shortcut="Échap" label="Fermer le lecteur" onClick={onClose}>
                 <X />
@@ -286,7 +342,7 @@ export function Player({ channel, now, onZap, onClose }: Props) {
                 <Rewind />
               </Control>
               <span className="w-24 text-center text-sm text-muted-foreground tabular-nums">
-                {formatDuration(time)} / {formatDuration(slot?.duration ?? 0)}
+                {formatDuration(time)} / {formatDuration(video?.duration ?? 0)}
               </span>
               <Control shortcut="→" label="Avancer de 30 s" onClick={() => seek(time + 30)} disabled={!ready}>
                 <FastForward />
@@ -294,11 +350,38 @@ export function Player({ channel, now, onZap, onClose }: Props) {
               <Control shortcut="⇧ →" label="Chapitre suivant" onClick={nextChapter} disabled={chapterIndex + 1 >= chapters.length}>
                 <SkipForward />
               </Control>
-              <Button variant="outline" className="ml-auto" onClick={goLive} disabled={!started || isLive}>
-                <Radio data-icon="inline-start" />
-                Retour au direct
-                <Kbd>D</Kbd>
-              </Button>
+              {source.kind === "channel" ? (
+                <div className="ml-auto flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => video && source.onMark(video.id)} disabled={!video}>
+                    <BookmarkPlus data-icon="inline-start" />
+                    À revoir
+                    <Kbd>M</Kbd>
+                  </Button>
+                  <Button variant="outline" onClick={tune} disabled={!started || isLive}>
+                    <Radio data-icon="inline-start" />
+                    Retour au direct
+                    <Kbd>D</Kbd>
+                  </Button>
+                </div>
+              ) : (
+                <div className="ml-auto flex flex-wrap gap-1">
+                  <Control
+                    label="Vidéo suivante de la liste"
+                    onClick={() => source.onSelect(source.videos[(laterIndex + 1) % source.videos.length].id)}
+                    disabled={source.videos.length < 2}
+                  >
+                    <ChevronsRight />
+                  </Control>
+                  <Button variant="outline" onClick={() => video && source.onRemove(video.id)} disabled={!video}>
+                    <BookmarkMinus data-icon="inline-start" />
+                    Remettre dans sa chaîne
+                  </Button>
+                  <Button variant="outline" onClick={() => video && source.onDone(video.id)} disabled={!video}>
+                    <Check data-icon="inline-start" />
+                    Vue
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,14 +1,24 @@
 // Types et appels de l'API servie par `tvfeed serve` (voir src/tvfeed/server.py).
 
-export type Slot = {
+export type Video = {
   id: string
   title: string
   source: string
   url: string
   thumbnail: string
   duration: number
+}
+
+export type Slot = Video & {
   start: string
   end: string
+}
+
+/** Vidéo de la liste « à revoir » (chaîne 0). */
+export type LaterVideo = Video & {
+  /** Chaîne d'où elle a été retirée. */
+  channel: string
+  marked_at: string
 }
 
 export type ChannelGuide = {
@@ -21,6 +31,7 @@ export type ChannelGuide = {
 export type Guide = {
   now: string
   channels: ChannelGuide[]
+  later: LaterVideo[]
 }
 
 const HOURS = 4
@@ -35,6 +46,10 @@ export const fetchGuide = () => request("GET", "/guide")
 export const shuffleAll = () => request("POST", "/shuffle")
 export const shuffleChannel = (name: string) =>
   request("POST", `/channels/${encodeURIComponent(name)}/shuffle`)
+export const markVideo = (channel: string, videoId: string) =>
+  request("POST", `/channels/${encodeURIComponent(channel)}/videos/${videoId}/mark`)
+export const unmarkVideo = (videoId: string) => request("DELETE", `/later/${videoId}`)
+export const markDone = (videoId: string) => request("POST", `/later/${videoId}/done`)
 
 export type Chapter = {
   start: number

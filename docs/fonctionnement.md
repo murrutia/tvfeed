@@ -56,6 +56,12 @@ les vidéos uniquement quand l'interface demande le programme.
 | `POST /api/shuffle`                 | Remélange tout, renvoie le nouveau programme  |
 | `POST /api/channels/{nom}/shuffle`  | Remélange une chaîne, renvoie son programme   |
 | `GET /api/videos/{id}/chapters`     | Chapitres d'une vidéo (cache sans expiration) |
+| `POST /api/channels/{nom}/videos/{id}/mark` | Marque une vidéo « à revoir »         |
+| `DELETE /api/later/{id}`            | Remet une vidéo marquée dans sa chaîne        |
+| `POST /api/later/{id}/done`         | Note une vidéo marquée comme vue              |
+
+Les routes qui modifient le programme renvoient le nouveau programme ; la réponse de
+`/api/guide` inclut aussi la liste `later` des vidéos à revoir.
 | `/`                                 | Interface compilée (`web/dist`)               |
 
 L'interface (`web/`) est une application React + Vite construite avec
@@ -86,6 +92,25 @@ Un badge indique l'écart avec la grille : *En direct*, *Différé de…* ou *En
 À la fin d'une vidéo, le lecteur rejoint le direct, qui a pu avancer si on a fait pause ou
 reculé.
 
+## Vidéos à revoir (chaîne 0)
+
+Dans le lecteur, **À revoir** (++m++) marque la vidéo en cours : elle quitte sa chaîne, et la
+suivante démarre aussitôt. Les vidéos marquées sont enregistrées dans `data/later.json` et
+forment la chaîne 0, affichée au-dessus des autres.
+
+La chaîne 0 ne suit pas de grille : elle lit les vidéos dans l'ordre de marquage, chacune
+depuis le début. Une vidéo vue jusqu'au bout (ou notée **Vue**) quitte la liste et ne revient
+pas dans sa chaîne. **Remettre dans sa chaîne** la retire de la liste et la remet dans sa
+chaîne d'origine.
+
+Retirer une vidéo d'une playlist décalerait toute la grille. Pour l'éviter :
+
+- le mélange est fait sur toutes les vidéos, puis les vidéos marquées sont filtrées : l'ordre
+  des autres ne change pas ([`build_playlist`][tvfeed.schedule.build_playlist]) ;
+- l'ancre de la chaîne est recalculée ([`anchor_at`][tvfeed.schedule.anchor_at]) pour que
+  la vidéo suivante démarre maintenant au marquage, et que la vidéo en cours ne bouge pas
+  quand une vidéo est remise dans sa chaîne.
+
 ### Raccourcis clavier
 
 | Touche          | Action                              |
@@ -98,6 +123,8 @@ reculé.
 | ++shift+left++ / ++shift+right++ | Chapitre précédent / suivant |
 | ++home++        | Revenir au début                    |
 | ++d++           | Retour au direct                    |
+| ++m++           | Marquer à revoir                    |
+| ++0++           | Vidéos à revoir                     |
 
 La liste est aussi accessible depuis l'icône clavier en haut de la page. Un clic dans la
 vidéo YouTube lui donnerait le focus clavier : la page le reprend aussitôt pour que les
