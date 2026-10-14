@@ -27,8 +27,8 @@ Les fonctionnalités seraient :
         - [ ] Avec une IA locale
             - [ ] proposer des thèmes en fonction des chaînes déjà existantes
             - [ ] proposer des chaînes en fonction des thèmes existants
-- [ ] Navigation entre les chaînes
-    - [ ] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
+- [x] Navigation entre les chaînes
+    - [x] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
 - [ ] Contrôle depuis une "télécommande"
     - [ ] Déterminer la faisabilité de contrôler l'ordi avec une manette PS3 ou une app Android
 

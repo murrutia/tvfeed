@@ -46,6 +46,7 @@ toc.permalink = true
 pymdownx.details = {}
 pymdownx.highlight.anchor_linenums = true
 pymdownx.inlinehilite = {}
+pymdownx.keys = {}
 pymdownx.tabbed.alternate_style = true
 pymdownx.superfences.custom_fences = [
   { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },

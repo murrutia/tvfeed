@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   ListVideo,
   Radio,
   Rewind,
@@ -14,13 +15,22 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Kbd } from "@/components/ui/kbd"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchChapters, liveSlot, type ChannelGuide, type Chapter, type Slot } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { formatDuration, formatTime } from "@/lib/format"
+import { useKeydown } from "@/lib/keyboard"
 import { loadYouTubeApi } from "@/lib/youtube"
+
+// Codes d'erreur du lecteur : vidéo introuvable/privée, intégration interdite par l'auteur.
+const ERROR_MESSAGES: Record<number, string> = {
+  100: "Cette vidéo est introuvable ou privée.",
+  101: "L'auteur de cette vidéo interdit sa lecture en dehors de YouTube.",
+  150: "L'auteur de cette vidéo interdit sa lecture en dehors de YouTube.",
+}
 
 // En deçà de cet écart avec la grille, on considère qu'on regarde « en direct ».
 const LIVE_TOLERANCE = 5
@@ -45,6 +55,7 @@ export function Player({ channel, now, onZap, onClose }: Props) {
   // vidéo charge, sa position (0) ne dit rien de l'écart avec le direct.
   const requestKey = useRef<number | null>(null)
   const [startedKey, setStartedKey] = useState<number | null>(null)
+  const [error, setError] = useState<{ key: number | null; code: number } | null>(null)
   const pendingSeek = useRef<{ time: number; until: number } | null>(null)
   // Chapitres associés à leur vidéo, pour ignorer ceux de la vidéo précédente.
   const [loaded, setLoaded] = useState<{ videoId: string; chapters: Chapter[] } | null>(null)
@@ -84,6 +95,7 @@ export function Player({ channel, now, onZap, onClose }: Props) {
               setStartedKey(requestKey.current)
             }
           },
+          onError: (e) => setError({ key: requestKey.current, code: e.data }),
         },
       })
     })
@@ -94,6 +106,17 @@ export function Player({ channel, now, onZap, onClose }: Props) {
       container.replaceChildren()
     }
   }, [goLive])
+
+  // Un clic dans l'iframe YouTube lui donne le focus clavier, et nos raccourcis ne
+  // reçoivent plus rien : on rend le focus à la page.
+  useEffect(() => {
+    const onBlur = () =>
+      setTimeout(() => {
+        if (document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur()
+      })
+    window.addEventListener("blur", onBlur)
+    return () => window.removeEventListener("blur", onBlur)
+  }, [])
 
   // Changement de chaîne : on se cale sur le direct.
   useEffect(goLive, [channel.name, goLive])
@@ -151,24 +174,72 @@ export function Player({ channel, now, onZap, onClose }: Props) {
     if (next) seek(next.start)
   }
 
+  const togglePlay = () => {
+    const p = playerRef.current
+    if (!p) return
+    if (p.getPlayerState() === YT.PlayerState.PLAYING) p.pauseVideo()
+    else p.playVideo()
+  }
+
+  useKeydown((e) => {
+    const actions: Record<string, () => void> = {
+      " ": togglePlay,
+      ArrowLeft: e.shiftKey ? prevChapter : () => seek(time - 10),
+      ArrowRight: e.shiftKey ? nextChapter : () => seek(time + 30),
+      Home: () => seek(0),
+      d: goLive,
+    }
+    const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key]
+    if (!action || !ready) return
+    // Empêche le défilement de la page et l'activation du bouton qui a le focus.
+    e.preventDefault()
+    action()
+  })
+
   const live = liveSlot(channel, now)
   const slot = request?.slot
   const isLiveVideo = !!slot && !!live && slot.id === live.id && slot.start === live.start
   const delay = isLiveVideo ? (now.getTime() - new Date(live.start).getTime()) / 1000 - time : null
   const isLive = delay !== null && Math.abs(delay) < LIVE_TOLERANCE
   const started = !!request && startedKey === request.key
+  const errorMessage = request && error?.key === request.key ? (ERROR_MESSAGES[error.code] ?? "Lecture impossible.") : null
+  // Lien de secours : la vidéo sur YouTube, à l'instant prévu par la grille.
+  const youtubeUrl = slot && `https://www.youtube.com/watch?v=${slot.id}&t=${Math.floor(isLiveVideo ? (now.getTime() - new Date(slot.start).getTime()) / 1000 : request!.start)}s`
 
   return (
     <Card className="py-0">
       <CardContent className="grid gap-4 p-0 lg:grid-cols-[1fr_20rem]">
         <div className="flex min-w-0 flex-col gap-3">
-          <div ref={containerRef} className="aspect-video w-full overflow-hidden bg-black lg:rounded-tl-xl [&_iframe]:size-full" />
+          <div className="relative aspect-video w-full overflow-hidden bg-black lg:rounded-tl-xl">
+            <div ref={containerRef} className="size-full [&_iframe]:size-full" />
+            {errorMessage && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 text-center text-white">
+                <p>{errorMessage}</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {youtubeUrl && (
+                    <Button asChild variant="secondary">
+                      <a href={youtubeUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink data-icon="inline-start" />
+                        Regarder sur YouTube
+                      </a>
+                    </Button>
+                  )}
+                  <Button variant="outline" className="text-foreground" onClick={() => onZap(1)}>
+                    <ChevronDown data-icon="inline-start" />
+                    Chaîne suivante
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex flex-col gap-3 px-4 pb-4">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">{channel.name}</span>
-                  {!started ? (
+                  {errorMessage ? (
+                    <Badge variant="outline">Indisponible</Badge>
+                  ) : !started ? (
                     <Badge variant="outline">Chargement…</Badge>
                   ) : isLive ? (
                     <Badge variant="destructive">
@@ -193,39 +264,40 @@ export function Player({ channel, now, onZap, onClose }: Props) {
                 <p className="mt-1 line-clamp-2 text-lg font-medium leading-snug">{slot?.title ?? "Chargement…"}</p>
                 <p className="text-sm text-muted-foreground">{slot?.source}</p>
               </div>
-              <Control label="Fermer le lecteur" onClick={onClose}>
+              <Control shortcut="Échap" label="Fermer le lecteur" onClick={onClose}>
                 <X />
               </Control>
             </div>
             <div className="flex flex-wrap items-center gap-1">
-              <Control label="Chaîne précédente" onClick={() => onZap(-1)}>
+              <Control shortcut="↑" label="Chaîne précédente" onClick={() => onZap(-1)}>
                 <ChevronUp />
               </Control>
-              <Control label="Chaîne suivante" onClick={() => onZap(1)}>
+              <Control shortcut="↓" label="Chaîne suivante" onClick={() => onZap(1)}>
                 <ChevronDown />
               </Control>
               <span className="mx-1 h-6 w-px bg-border" />
-              <Control label="Revenir au début" onClick={() => seek(0)} disabled={!ready}>
+              <Control shortcut="Début" label="Revenir au début" onClick={() => seek(0)} disabled={!ready}>
                 <RotateCcw />
               </Control>
-              <Control label="Chapitre précédent" onClick={prevChapter} disabled={!chapters.length}>
+              <Control shortcut="⇧ ←" label="Chapitre précédent" onClick={prevChapter} disabled={!chapters.length}>
                 <SkipBack />
               </Control>
-              <Control label="Reculer de 10 s" onClick={() => seek(time - 10)} disabled={!ready}>
+              <Control shortcut="←" label="Reculer de 10 s" onClick={() => seek(time - 10)} disabled={!ready}>
                 <Rewind />
               </Control>
               <span className="w-24 text-center text-sm text-muted-foreground tabular-nums">
                 {formatDuration(time)} / {formatDuration(slot?.duration ?? 0)}
               </span>
-              <Control label="Avancer de 30 s" onClick={() => seek(time + 30)} disabled={!ready}>
+              <Control shortcut="→" label="Avancer de 30 s" onClick={() => seek(time + 30)} disabled={!ready}>
                 <FastForward />
               </Control>
-              <Control label="Chapitre suivant" onClick={nextChapter} disabled={chapterIndex + 1 >= chapters.length}>
+              <Control shortcut="⇧ →" label="Chapitre suivant" onClick={nextChapter} disabled={chapterIndex + 1 >= chapters.length}>
                 <SkipForward />
               </Control>
               <Button variant="outline" className="ml-auto" onClick={goLive} disabled={!started || isLive}>
                 <Radio data-icon="inline-start" />
                 Retour au direct
+                <Kbd>D</Kbd>
               </Button>
             </div>
           </div>
@@ -236,7 +308,12 @@ export function Player({ channel, now, onZap, onClose }: Props) {
   )
 }
 
-function Control({ label, children, ...props }: React.ComponentProps<typeof Button> & { label: string }) {
+function Control({
+  label,
+  shortcut,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & { label: string; shortcut?: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -244,7 +321,10 @@ function Control({ label, children, ...props }: React.ComponentProps<typeof Butt
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        {label}
+        {shortcut && <Kbd>{shortcut}</Kbd>}
+      </TooltipContent>
     </Tooltip>
   )
 }

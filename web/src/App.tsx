@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react"
-import { Shuffle } from "lucide-react"
+import { Keyboard, Shuffle } from "lucide-react"
 
 import { ChannelRow } from "@/components/channel-row"
 import { Player } from "@/components/player"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Kbd } from "@/components/ui/kbd"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchGuide, shuffleAll, shuffleChannel, type Guide } from "@/lib/api"
 import { formatTime } from "@/lib/format"
+import { SHORTCUTS, useKeydown } from "@/lib/keyboard"
 
 // Le serveur ne travaille qu'à la demande : on recharge le programme de temps en
 // temps pour qu'il couvre toujours les heures à venir.
@@ -39,6 +42,19 @@ export default function App() {
   }
 
   const watched = guide?.channels.find((c) => c.name === watching)
+
+  useKeydown((e) => {
+    if (!guide) return
+    if (/^[1-9]$/.test(e.key)) {
+      const channel = guide.channels[Number(e.key) - 1]
+      if (channel) watch(channel.name)
+    } else if (watching && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault() // pas de défilement de la page
+      zap(e.key === "ArrowUp" ? -1 : 1)
+    } else if (watching && e.key === "Escape") {
+      setWatching(null)
+    }
+  })
 
   const load = useCallback(async (call: () => Promise<Guide>) => {
     try {
@@ -77,7 +93,28 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <h1 className="text-xl font-semibold tracking-tight">tvfeed</h1>
           <span className="text-muted-foreground tabular-nums">{formatTime(now)}</span>
-          <Button variant="outline" className="ml-auto" onClick={() => shuffle(null)} disabled={shuffling !== null}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="ml-auto" aria-label="Raccourcis clavier">
+                <Keyboard />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="p-3">
+              <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
+                {SHORTCUTS.map((s) => (
+                  <div key={s.label} className="contents">
+                    <dt className="flex gap-1">
+                      {s.keys.map((k) => (
+                        <Kbd key={k}>{k}</Kbd>
+                      ))}
+                    </dt>
+                    <dd>{s.label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </TooltipContent>
+          </Tooltip>
+          <Button variant="outline" onClick={() => shuffle(null)} disabled={shuffling !== null}>
             <Shuffle data-icon="inline-start" />
             Tout remélanger
           </Button>
@@ -91,9 +128,10 @@ export default function App() {
         )}
         {watched && <Player channel={watched} now={now} onZap={zap} onClose={() => setWatching(null)} />}
         {guide
-          ? guide.channels.map((c) => (
+          ? guide.channels.map((c, i) => (
               <ChannelRow
                 key={c.name}
+                number={i + 1}
                 channel={c}
                 now={now}
                 shuffling={shuffling === c.name || shuffling === "*"}

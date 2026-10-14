@@ -3,6 +3,7 @@ import { Play, Shuffle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Kbd } from "@/components/ui/kbd"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -10,6 +11,8 @@ import type { ChannelGuide, Slot } from "@/lib/api"
 import { formatDuration, formatTime } from "@/lib/format"
 
 type Props = {
+  /** Numéro de la chaîne, aussi raccourci clavier pour l'ouvrir (1 à 9). */
+  number: number
   channel: ChannelGuide
   now: Date
   shuffling: boolean
@@ -17,7 +20,7 @@ type Props = {
   onWatch: () => void
 }
 
-export function ChannelRow({ channel, now, shuffling, onShuffle, onWatch }: Props) {
+export function ChannelRow({ number, channel, now, shuffling, onShuffle, onWatch }: Props) {
   // Le programme est calculé par le serveur ; on avance dans la grille côté client
   // en masquant les créneaux déjà terminés.
   const slots = channel.slots.filter((s) => new Date(s.end) > now)
@@ -26,7 +29,10 @@ export function ChannelRow({ channel, now, shuffling, onShuffle, onWatch }: Prop
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{channel.name}</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {number <= 9 && <Kbd>{number}</Kbd>}
+          {channel.name}
+        </CardTitle>
         <CardDescription className="flex flex-wrap items-center gap-1.5">
           {channel.themes.map((t) => (
             <Badge key={t} variant="secondary">

@@ -78,9 +78,30 @@ et ajoute ses propres commandes :
 - chapitre précédent / suivant, et liste des chapitres cliquable ;
 - **retour au direct**, quand on s'est écarté de la grille.
 
+Si l'auteur interdit la lecture hors de YouTube (erreurs 101/150 du lecteur), un message le
+signale, avec un lien vers la vidéo sur YouTube à l'instant prévu par la grille et un bouton
+pour passer à la chaîne suivante.
+
 Un badge indique l'écart avec la grille : *En direct*, *Différé de…* ou *En avance de…*.
 À la fin d'une vidéo, le lecteur rejoint le direct, qui a pu avancer si on a fait pause ou
 reculé.
+
+### Raccourcis clavier
+
+| Touche          | Action                              |
+| --------------- | ----------------------------------- |
+| ++up++ / ++down++       | Chaîne précédente / suivante        |
+| ++1++ … ++9++   | Aller à la chaîne n (numéro affiché à côté de son nom) |
+| ++esc++         | Fermer le lecteur                   |
+| ++space++       | Lecture / pause                     |
+| ++left++ / ++right++    | Reculer de 10 s / avancer de 30 s   |
+| ++shift+left++ / ++shift+right++ | Chapitre précédent / suivant |
+| ++home++        | Revenir au début                    |
+| ++d++           | Retour au direct                    |
+
+La liste est aussi accessible depuis l'icône clavier en haut de la page. Un clic dans la
+vidéo YouTube lui donnerait le focus clavier : la page le reprend aussitôt pour que les
+raccourcis restent actifs (les raccourcis propres à YouTube sont donc remplacés par ceux-ci).
 
 Les chapitres ne sont pas fournis par la récupération des listes (mode « flat ») : ils sont
 lus à la demande, vidéo par vidéo, par [`get_chapters`][tvfeed.sources.get_chapters]
