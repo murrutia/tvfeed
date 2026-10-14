@@ -54,6 +54,8 @@ uv run tvfeed shuffle [chaîne]     # remélanger une chaîne (ou toutes)
 | `TVFEED_CONFIG`          | `channels.toml` | Fichier de définition des chaînes     |
 | `TVFEED_DATA`            | `data`          | Dossier du cache, de l'état et des vidéos à revoir |
 | `TVFEED_WEB`             | `web/dist`      | Interface compilée servie sur `/`     |
+| `TVFEED_OLLAMA_URL`      | `http://localhost:11434` | Adresse d'Ollama (IA locale facultative) |
+| `TVFEED_AI_MODEL`        | plus gros modèle installé | Modèle Ollama utilisé            |
 
 ## Tests
 

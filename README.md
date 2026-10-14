@@ -21,12 +21,12 @@ Les fonctionnalités seraient :
     - [x] N'effectuerait les requêtes qu'à l'ouverture de l'interface. Pas besoin de tourner en permanence en arrière plan.
     - [x] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
     - [x] Dans l'affichage du programme on aurait les vignettes des vidéos
-    - [ ] Interface de gestion des chaînes
+    - [x] Interface de gestion des chaînes
         - [x] Listing des chaînes avec leur titre et thèmes/mots clés
         - [x] Ajout et suppression de chaînes
-        - [ ] Avec une IA locale
-            - [ ] proposer des thèmes en fonction des chaînes déjà existantes
-            - [ ] proposer des chaînes en fonction des thèmes existants
+        - [x] Avec une IA locale
+            - [x] proposer des thèmes en fonction des chaînes déjà existantes
+            - [x] proposer des chaînes en fonction des thèmes existants
 - [x] Navigation entre les chaînes
     - [x] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
 - [ ] Contrôle depuis une "télécommande"

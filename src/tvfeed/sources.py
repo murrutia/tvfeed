@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import time
+import urllib.parse
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -165,3 +166,53 @@ def get_videos(url: str, limit: int, cache_dir: Path, force: bool = False) -> li
         json.dumps({"url": url, "fetched_at": time.time(), "videos": [asdict(v) for v in videos]})
     )
     return videos
+
+
+@dataclass
+class ChannelResult:
+    """Chaîne YouTube trouvée par une recherche.
+
+    Attributes:
+        name: Nom de la chaîne.
+        url: URL de la chaîne (forme `@handle` si connue).
+        followers: Nombre d'abonnés, s'il est connu.
+        description: Description de la chaîne.
+        thumbnail: URL de l'avatar.
+    """
+
+    name: str
+    url: str
+    followers: int | None
+    description: str
+    thumbnail: str
+
+
+def search_channels(query: str, limit: int = 6) -> list[ChannelResult]:
+    """Cherche des chaînes YouTube (et non des vidéos) correspondant à une requête.
+
+    Args:
+        query: Texte recherché.
+        limit: Nombre maximal de résultats.
+
+    Returns:
+        Les chaînes trouvées, dans l'ordre de pertinence de YouTube.
+    """
+    # `sp=EgIQAg==` : filtre « Chaînes » de la page de résultats YouTube.
+    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}&sp=EgIQAg%3D%3D"
+    opts = {"extract_flat": True, "playlistend": limit, "quiet": True, "no_warnings": True, "skip_download": True}
+    with YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    results = []
+    for e in info.get("entries") or []:
+        handle = e.get("uploader_id") or ""
+        thumbnail = (e.get("thumbnails") or [{}])[-1].get("url", "")
+        results.append(
+            ChannelResult(
+                name=e.get("channel") or e.get("title") or handle,
+                url=f"https://www.youtube.com/{handle}" if handle.startswith("@") else e["url"],
+                followers=e.get("channel_follower_count"),
+                description=e.get("description") or "",
+                thumbnail=f"https:{thumbnail}" if thumbnail.startswith("//") else thumbnail,
+            )
+        )
+    return results

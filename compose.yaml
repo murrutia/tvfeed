@@ -6,3 +6,8 @@ services:
     volumes:
       - ./channels.toml:/app/channels.toml
       - ./data:/data
+    environment:
+      # IA locale facultative : Ollama tournant sur l'hôte (voir la documentation).
+      TVFEED_OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

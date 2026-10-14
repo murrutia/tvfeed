@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, guide
+from . import ai, assist, config, guide
 from .config import DEFAULT_PER_SOURCE, Channel, load_channels
 from .schedule import Slot
 from .sources import Video, get_chapters
@@ -222,6 +222,49 @@ def delete_channel(name: str) -> list[dict]:
     except KeyError as e:
         raise HTTPException(404, f"Chaîne inconnue : {e}") from e
     return list_channels()
+
+
+class Draft(BaseModel):
+    """Chaîne en cours d'édition, pour les suggestions."""
+
+    name: str = ""
+    themes: list[str] = []
+    sources: list[str] = []
+    use_ai: bool = True
+
+
+@app.get("/api/ai")
+def ai_status() -> dict:
+    """Modèle d'IA locale utilisé, ou `null` si Ollama est indisponible."""
+    return {"model": ai.model()}
+
+
+@app.post("/api/assist/themes")
+def suggest_themes(draft: Draft) -> dict:
+    """Thèmes proposés par l'IA d'après les vidéos des sources.
+
+    Raises:
+        HTTPException: 503 si l'IA locale est indisponible ou en erreur.
+    """
+    try:
+        return {"themes": assist.suggest_themes(draft.name, draft.themes, draft.sources)}
+    except Exception as e:
+        raise HTTPException(503, f"IA locale indisponible : {e}") from e
+
+
+@app.post("/api/assist/channels")
+def discover_channels(draft: Draft) -> dict:
+    """Chaînes YouTube qui conviendraient, d'après le nom, les thèmes et les sources.
+
+    Raises:
+        HTTPException: 422 sans nom ni thème, 502 si la recherche YouTube échoue.
+    """
+    if not draft.name.strip() and not draft.themes:
+        raise HTTPException(422, "Indiquez au moins un nom ou un thème")
+    try:
+        return assist.discover(draft.name.strip(), draft.themes, draft.sources, draft.use_ai)
+    except Exception as e:
+        raise HTTPException(502, f"Recherche impossible : {e}") from e
 
 
 if WEB_DIST.is_dir():

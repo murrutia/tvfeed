@@ -100,3 +100,32 @@ export const updateChannel = (name: string, channel: ChannelDef) =>
   channelsRequest("PUT", `/${encodeURIComponent(name)}`, channel)
 export const deleteChannel = (name: string) => channelsRequest("DELETE", `/${encodeURIComponent(name)}`)
 export const reorderChannels = (names: string[]) => channelsRequest("PUT", "/order", { names })
+
+/** Chaîne YouTube trouvée par la recherche d'aide à la création. */
+export type FoundChannel = {
+  name: string
+  url: string
+  followers: number | null
+  description: string
+  thumbnail: string
+  /** Chaîne locale qui utilise déjà cette source. */
+  used_in: string | null
+}
+
+export type Discovery = { queries: string[]; ai: boolean; channels: FoundChannel[] }
+
+type Draft = { name: string; themes: string[]; sources: string[] }
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await check(
+    await fetch(`/api${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  )
+  return res.json()
+}
+
+/** Modèle d'IA locale disponible, ou `null`. */
+export const fetchAiModel = async (): Promise<string | null> =>
+  (await (await check(await fetch("/api/ai"))).json()).model
+
+export const suggestThemes = async (draft: Draft) => (await post<{ themes: string[] }>("/assist/themes", draft)).themes
+export const discoverChannels = (draft: Draft) => post<Discovery>("/assist/channels", draft)

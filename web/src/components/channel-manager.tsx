@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   createChannel,
   deleteChannel,
+  fetchAiModel,
   listChannels,
   reorderChannels,
   updateChannel,
@@ -40,9 +41,13 @@ export function ChannelManager({ open, onOpenChange, onChanged }: Props) {
   // Formulaire ouvert : `null` pour une création, la chaîne pour une modification.
   const [editing, setEditing] = useState<ChannelDef | null | undefined>(undefined)
   const [deleting, setDeleting] = useState<ChannelDef | null>(null)
+  const [aiModel, setAiModel] = useState<string | null>(null)
 
   useEffect(() => {
-    if (open) listChannels().then(setChannels, (e) => setError(String(e)))
+    if (!open) return
+    listChannels().then(setChannels, (e) => setError(String(e)))
+    // IA facultative : sans Ollama, les suggestions de thèmes sont simplement masquées.
+    fetchAiModel().then(setAiModel, () => setAiModel(null))
   }, [open])
 
   async function run(call: () => Promise<ChannelDef[]>, change: Parameters<Props["onChanged"]>[0] = {}) {
@@ -127,6 +132,7 @@ export function ChannelManager({ open, onOpenChange, onChanged }: Props) {
       <ChannelForm
         channel={editing ?? undefined}
         open={editing !== undefined}
+        aiModel={aiModel}
         onOpenChange={(o) => !o && setEditing(undefined)}
         onSubmit={save}
       />
