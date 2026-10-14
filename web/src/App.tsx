@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Shuffle } from "lucide-react"
 
 import { ChannelRow } from "@/components/channel-row"
+import { Player } from "@/components/player"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,6 +19,26 @@ export default function App() {
   const [now, setNow] = useState(() => new Date())
   // Chaîne en cours de mélange ; "*" pour toutes.
   const [shuffling, setShuffling] = useState<string | null>(null)
+  // Chaîne regardée, conservée dans l'URL (#Sciences) pour survivre à un rechargement.
+  const [watching, setWatching] = useState(() => decodeURIComponent(location.hash.slice(1)) || null)
+
+  useEffect(() => {
+    history.replaceState(null, "", watching ? `#${encodeURIComponent(watching)}` : location.pathname)
+  }, [watching])
+
+  function watch(name: string) {
+    setWatching(name)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  function zap(delta: 1 | -1) {
+    if (!guide || !watching) return
+    const names = guide.channels.map((c) => c.name)
+    const i = names.indexOf(watching)
+    setWatching(names[(i + delta + names.length) % names.length])
+  }
+
+  const watched = guide?.channels.find((c) => c.name === watching)
 
   const load = useCallback(async (call: () => Promise<Guide>) => {
     try {
@@ -68,6 +89,7 @@ export default function App() {
             Impossible de charger le programme : {error}
           </p>
         )}
+        {watched && <Player channel={watched} now={now} onZap={zap} onClose={() => setWatching(null)} />}
         {guide
           ? guide.channels.map((c) => (
               <ChannelRow
@@ -76,6 +98,7 @@ export default function App() {
                 now={now}
                 shuffling={shuffling === c.name || shuffling === "*"}
                 onShuffle={() => shuffle(c.name)}
+                onWatch={() => watch(c.name)}
               />
             ))
           : !error && Array.from({ length: 3 }, (_, i) => <ChannelSkeleton key={i} />)}

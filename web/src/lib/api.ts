@@ -35,3 +35,20 @@ export const fetchGuide = () => request("GET", "/guide")
 export const shuffleAll = () => request("POST", "/shuffle")
 export const shuffleChannel = (name: string) =>
   request("POST", `/channels/${encodeURIComponent(name)}/shuffle`)
+
+export type Chapter = {
+  start: number
+  end: number
+  title: string
+}
+
+export async function fetchChapters(videoId: string, signal?: AbortSignal): Promise<Chapter[]> {
+  const res = await fetch(`/api/videos/${videoId}/chapters`, { signal })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json()
+}
+
+/** Créneau diffusé à l'instant `now`. */
+export function liveSlot(channel: ChannelGuide, now: Date): Slot | undefined {
+  return channel.slots.find((s) => new Date(s.start) <= now && now < new Date(s.end))
+}

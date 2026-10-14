@@ -81,6 +81,63 @@ def _fetch(url: str, limit: int) -> list[Video]:
     return videos
 
 
+@dataclass
+class Chapter:
+    """Chapitre d'une vidéo.
+
+    Attributes:
+        start: Début, en secondes.
+        end: Fin, en secondes.
+        title: Titre du chapitre.
+    """
+
+    start: float
+    end: float
+    title: str
+
+
+def get_chapters(video_id: str, cache_dir: Path) -> list[Chapter]:
+    """Renvoie les chapitres d'une vidéo YouTube, depuis le cache si possible.
+
+    Les chapitres changent rarement : le cache n'expire pas.
+
+    Args:
+        video_id: Identifiant YouTube de la vidéo.
+        cache_dir: Dossier du cache.
+
+    Returns:
+        Les chapitres dans l'ordre, liste vide si la vidéo n'en a pas.
+
+    Raises:
+        yt_dlp.utils.DownloadError: Si la vidéo est inaccessible.
+    """
+    path = cache_dir / "chapters" / f"{video_id}.json"
+    if path.exists():
+        return [Chapter(**c) for c in json.loads(path.read_text())]
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        # Les chapitres viennent de la page ; inutile d'exécuter le JS du lecteur.
+        "extractor_args": {"youtube": {"player_skip": ["js"]}},
+    }
+    with YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(
+            f"https://www.youtube.com/watch?v={video_id}", download=False, process=False
+        )
+    raw = info.get("chapters") or []
+    # Sans traitement complet (`process=False`), yt-dlp ne calcule pas `end_time` :
+    # un chapitre finit où commence le suivant, le dernier à la fin de la vidéo.
+    ends = [c["start_time"] for c in raw[1:]] + [info.get("duration") or 0]
+    chapters = [
+        Chapter(start=c["start_time"], end=c.get("end_time") or end, title=c.get("title") or "")
+        for c, end in zip(raw, ends)
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps([asdict(c) for c in chapters]))
+    return chapters
+
+
 def get_videos(url: str, limit: int, cache_dir: Path, force: bool = False) -> list[Video]:
     """Renvoie les vidéos récentes d'une source, depuis le cache si possible.
 

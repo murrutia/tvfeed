@@ -9,14 +9,11 @@ Les fonctionnalités seraient :
     - [x] Définir le titre
     - [x] Définir les thèmes
     - [x] Rajouter des chaînes YouTube (ou autre plateforme vidéo)
-    - [ ] Avec une IA locale
-        - [ ] proposer des thèmes en fonction des chaînes déjà existantes
-        - [ ] proposer des chaînes en fonction des thèmes existants
  - [ ] Création de programme/sommaire télé
     - [x] Pour chaque chaîne, créer une playlist pour les quelques heures à venir (disons 4)
     - [x] Pouvoir afficher, de par la durée des vidéos, à quelle heure commenceront les prochaines vidéos
     - [x] Avancer virtuellement dans la playlist. De cette manière, en choisissant une chaîne, j'arrive en cours de vidéo.
-    - [ ] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
+    - [x] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
     - [ ] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
 - [x] Développer une interface utilisateur
     - [x] Page basée sur le framework visuel shadcn/ui
@@ -24,6 +21,16 @@ Les fonctionnalités seraient :
     - [x] N'effectuerait les requêtes qu'à l'ouverture de l'interface. Pas besoin de tourner en permanence en arrière plan.
     - [x] Pouvoir relancer un shuffle du contenu des chaînes (par exemple si le programme ne me satisfait pas)
     - [x] Dans l'affichage du programme on aurait les vignettes des vidéos
+    - [ ] Interface de gestion des chaînes
+        - [ ] Listing des chaînes avec leur titre et thèmes/mots clés
+        - [ ] Ajout et suppression de chaînes
+        - [ ] Avec une IA locale
+            - [ ] proposer des thèmes en fonction des chaînes déjà existantes
+            - [ ] proposer des chaînes en fonction des thèmes existants
+- [ ] Navigation entre les chaînes
+    - [ ] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
+- [ ] Contrôle depuis une "télécommande"
+    - [ ] Déterminer la faisabilité de contrôler l'ordi avec une manette PS3 ou une app Android
 
 ## Choix de technologie
 

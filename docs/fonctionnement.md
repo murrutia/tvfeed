@@ -55,6 +55,7 @@ les vidéos uniquement quand l'interface demande le programme.
 | `GET /api/guide?hours=4`            | Programme de toutes les chaînes               |
 | `POST /api/shuffle`                 | Remélange tout, renvoie le nouveau programme  |
 | `POST /api/channels/{nom}/shuffle`  | Remélange une chaîne, renvoie son programme   |
+| `GET /api/videos/{id}/chapters`     | Chapitres d'une vidéo (cache sans expiration) |
 | `/`                                 | Interface compilée (`web/dist`)               |
 
 L'interface (`web/`) est une application React + Vite construite avec
@@ -63,8 +64,27 @@ sa progression et les vidéos suivantes. Elle avance dans la grille seconde par 
 recharge le programme toutes les 15 minutes. Les composants shadcn sont dans
 `web/src/components/ui/` et s'ajoutent avec `npx shadcn@latest add <composant>` depuis `web/`.
 
-En attendant le lecteur intégré, cliquer sur la vidéo en cours l'ouvre sur YouTube à
-l'instant courant.
+## Lecteur
+
+Cliquer sur la vidéo en cours d'une chaîne ouvre le lecteur en haut de la page, calé sur la
+grille : on arrive en cours de vidéo, comme en allumant la télé. La chaîne regardée est gardée
+dans l'URL (`#Sciences`).
+
+Le lecteur utilise l'[API IFrame de YouTube](https://developers.google.com/youtube/iframe_api_reference)
+et ajoute ses propres commandes :
+
+- chaîne précédente / suivante (zapping) ;
+- revenir au début, reculer de 10 s, avancer de 30 s ;
+- chapitre précédent / suivant, et liste des chapitres cliquable ;
+- **retour au direct**, quand on s'est écarté de la grille.
+
+Un badge indique l'écart avec la grille : *En direct*, *Différé de…* ou *En avance de…*.
+À la fin d'une vidéo, le lecteur rejoint le direct, qui a pu avancer si on a fait pause ou
+reculé.
+
+Les chapitres ne sont pas fournis par la récupération des listes (mode « flat ») : ils sont
+lus à la demande, vidéo par vidéo, par [`get_chapters`][tvfeed.sources.get_chapters]
+(environ 1 s, puis depuis le cache).
 
 En production (Docker), Node ne sert qu'à compiler l'interface ; l'image finale ne contient
 que Python.

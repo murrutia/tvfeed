@@ -1,4 +1,4 @@
-import { Shuffle } from "lucide-react"
+import { Play, Shuffle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,9 +14,10 @@ type Props = {
   now: Date
   shuffling: boolean
   onShuffle: () => void
+  onWatch: () => void
 }
 
-export function ChannelRow({ channel, now, shuffling, onShuffle }: Props) {
+export function ChannelRow({ channel, now, shuffling, onShuffle, onWatch }: Props) {
   // Le programme est calculé par le serveur ; on avance dans la grille côté client
   // en masquant les créneaux déjà terminés.
   const slots = channel.slots.filter((s) => new Date(s.end) > now)
@@ -48,7 +49,7 @@ export function ChannelRow({ channel, now, shuffling, onShuffle }: Props) {
       <CardContent>
         {current ? (
           <div className="flex flex-col gap-4 md:flex-row">
-            <NowPlaying slot={current} now={now} />
+            <NowPlaying slot={current} now={now} onWatch={onWatch} />
             <ScrollArea className="min-w-0 flex-1">
               <ol className="flex gap-3 pb-3">
                 {upcoming.map((s) => (
@@ -66,14 +67,15 @@ export function ChannelRow({ channel, now, shuffling, onShuffle }: Props) {
   )
 }
 
-function NowPlaying({ slot, now }: { slot: Slot; now: Date }) {
+function NowPlaying({ slot, now, onWatch }: { slot: Slot; now: Date; onWatch: () => void }) {
   const elapsed = (now.getTime() - new Date(slot.start).getTime()) / 1000
-  // Lien YouTube positionné à l'instant courant, en attendant le lecteur intégré.
-  const href = `https://www.youtube.com/watch?v=${slot.id}&t=${Math.floor(elapsed)}s`
 
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="group flex w-full shrink-0 flex-col gap-2 md:w-80">
+    <button type="button" onClick={onWatch} className="group flex w-full shrink-0 cursor-pointer flex-col gap-2 text-left md:w-80">
       <div className="relative overflow-hidden rounded-lg">
+        <span className="absolute inset-0 z-10 grid place-items-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+          <Play className="size-12 fill-white text-white" />
+        </span>
         <img src={slot.thumbnail} alt="" className="aspect-video w-full object-cover transition-transform group-hover:scale-105" />
         <Badge className="absolute top-2 left-2">En cours</Badge>
       </div>
@@ -89,7 +91,7 @@ function NowPlaying({ slot, now }: { slot: Slot; now: Date }) {
         <p className="line-clamp-2 font-medium group-hover:underline">{slot.title}</p>
         <p className="text-sm text-muted-foreground">{slot.source}</p>
       </div>
-    </a>
+    </button>
   )
 }
 

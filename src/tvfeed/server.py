@@ -1,6 +1,7 @@
 """Serveur web : API JSON du programme et interface compilée (`web/dist`)."""
 
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from . import guide
 from .config import load_channels
 from .schedule import Slot
+from .sources import get_chapters
 
 WEB_DIST = Path(os.environ.get("TVFEED_WEB", "web/dist"))
 """Dossier de l'interface compilée (variable `TVFEED_WEB`)."""
@@ -77,6 +79,22 @@ def shuffle_channel(name: str, hours: float = 4) -> dict:
         raise HTTPException(404, f"Chaîne inconnue : {name}")
     guide.shuffle(name)
     return _guide(*guide.get_guide(hours, channel=name))
+
+
+@app.get("/api/videos/{video_id}/chapters")
+def chapters(video_id: str) -> list[dict]:
+    """Chapitres d'une vidéo YouTube (liste vide si elle n'en a pas).
+
+    Raises:
+        HTTPException: 400 si l'identifiant est invalide, 502 si YouTube ne répond pas.
+    """
+    # L'identifiant sert de nom de fichier dans le cache : on le valide strictement.
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        raise HTTPException(400, "Identifiant de vidéo invalide")
+    try:
+        return [vars(c) for c in get_chapters(video_id, guide.DATA / "cache")]
+    except Exception as e:
+        raise HTTPException(502, f"Chapitres indisponibles : {e}") from e
 
 
 if WEB_DIST.is_dir():
