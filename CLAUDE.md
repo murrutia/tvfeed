@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Python ≥3.12, managed with `uv`; web UI uses npm in `web/`. No test suite or linter is configured yet.
+Python ≥3.12, managed with `uv`; web UI uses npm in `web/`. Backend tests with pytest; web lint with oxlint (`npm --prefix web run lint`).
 
 ```sh
+uv run pytest                                # backend tests, offline (~0.5 s)
 uv run tvfeed serve [--reload]               # API + built UI (web/dist) on :8080
 npm --prefix web run dev                     # Vite on :5173, proxies /api to :8080
 npm --prefix web run build                   # tsc + build into web/dist
@@ -40,6 +41,10 @@ Pipeline: `channels.toml` → `config.load_channels` → `sources.get_videos` (y
 - **Channel management**: `config.upsert_channel` / `delete_channel` / `reorder_channels` rewrite `channels.toml` with tomlkit (comments/format preserved) under a module lock. `guide.save_channel` validates only *new* sources (or all if `per_source` changed) via `check_sources` (fetch through the cache), and on rename moves the `state.json` entry and `later.json` origin channel. API: `GET/POST /api/channels`, `PUT/DELETE /api/channels/{name}`, `PUT /api/channels/order` (declared before `{name}` routes). UI: `channel-manager.tsx` (Sheet) + `channel-form.tsx` (Dialog). In `App.tsx`, `load(call, partial)` replaces the guide unless `partial` (single-channel shuffle). `useKeydown` ignores events inside dialogs.
 - **Later list / channel 0 (`guide.mark`, `unmark`, `mark_done`)**: marked videos live in `data/later.json` (`Marked`: video, origin channel, `done`). All marked ids (done or not) are excluded from channel playlists. `build_playlist` shuffles the full list *then* filters `exclude`, so marking doesn't reorder other videos. Grid jumps are avoided by re-anchoring with `schedule.anchor_at`: `mark` makes the following video start now; `unmark` keeps the channel's current video at the same offset. The UI shows channel 0 only when the list is non-empty; it plays in marking order from 0 (no grid), and on end calls `done` then advances (`leaveLater` in `App.tsx`). `Player` takes a `Source` (`channel` | `later`) and a `resync` counter the page bumps to make it re-tune after programme changes.
 - Known limitation: when the cache refreshes and new videos appear, the playlist (and thus the grid) changes.
+
+## Tests
+
+`tests/conftest.py` isolates every test: `guide.CONFIG/DATA/STATE/LATER` point to `tmp_path`, and `guide.get_videos` is replaced by fake sources (`SOURCES`; `https://src/unknown` raises, `https://src/empty` is empty) — no network. `test_guide.py` moves anchors into the past (`mid_programme`) so re-anchoring bugs aren't masked by a fresh anchor at offset 0. Cover new backend behaviour there; the frontend has no unit tests (mostly YouTube player integration, checked manually / via headless Chrome).
 
 ## Conventions
 

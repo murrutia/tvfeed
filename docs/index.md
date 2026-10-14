@@ -55,6 +55,12 @@ uv run tvfeed shuffle [chaîne]     # remélanger une chaîne (ou toutes)
 | `TVFEED_DATA`            | `data`          | Dossier du cache, de l'état et des vidéos à revoir |
 | `TVFEED_WEB`             | `web/dist`      | Interface compilée servie sur `/`     |
 
+## Tests
+
+```sh
+uv run pytest   # tests du serveur, sans accès réseau
+```
+
 ## Développer l'interface
 
 ```sh
