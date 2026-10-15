@@ -21,11 +21,18 @@ export type LaterVideo = Video & {
   marked_at: string
 }
 
+/** `youtube` : programme de vidéos ; `iptv` : télévision en direct, sans programme. */
+export type ChannelKind = "youtube" | "iptv"
+
 export type ChannelGuide = {
   name: string
+  kind: ChannelKind
   themes: string[]
   video_count: number
   slots: Slot[]
+  /** Chaîne IPTV : flux HLS à essayer dans l'ordre. */
+  streams: string[]
+  logo: string
 }
 
 export type Guide = {
@@ -79,8 +86,12 @@ export function liveSlot(channel: ChannelGuide, now: Date): Slot | undefined {
 export type ChannelDef = {
   name: string
   themes: string[]
+  /** Sources YouTube, ou flux HLS pour une chaîne IPTV. */
   sources: string[]
   per_source: number
+  kind?: ChannelKind
+  logo?: string
+  iptv_id?: string
 }
 
 async function channelsRequest(method: string, path: string, body?: unknown): Promise<ChannelDef[]> {
@@ -129,3 +140,27 @@ export const fetchAiModel = async (): Promise<string | null> =>
 
 export const suggestThemes = async (draft: Draft) => (await post<{ themes: string[] }>("/assist/themes", draft)).themes
 export const discoverChannels = (draft: Draft) => post<Discovery>("/assist/channels", draft)
+
+/** Chaîne du catalogue iptv-org. */
+export type IptvChannel = {
+  id: string
+  name: string
+  country: string
+  country_name: string
+  flag: string
+  categories: string[]
+  logo: string
+  streams: { url: string; quality: string | null }[]
+}
+
+export type IptvFilters = {
+  countries: { code: string; name: string; flag: string; count: number }[]
+  categories: { id: string; name: string; count: number }[]
+}
+
+export const fetchIptvFilters = async (): Promise<IptvFilters> => (await check(await fetch("/api/iptv/filters"))).json()
+
+export async function searchIptv(params: { q: string; country: string; category: string }, signal?: AbortSignal): Promise<IptvChannel[]> {
+  const query = new URLSearchParams(params)
+  return (await check(await fetch(`/api/iptv/search?${query}`, { signal }))).json()
+}

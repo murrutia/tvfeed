@@ -18,6 +18,9 @@ def cmd_guide(args) -> None:
     for g in guides:
         c = g.channel
         themes = f" ({', '.join(c.themes)})" if c.themes else ""
+        if c.is_iptv:
+            print(f"\n=== {c.name}{themes} — IPTV, en direct ===")
+            continue
         print(f"\n=== {c.name}{themes} — {g.video_count} vidéos ===")
         for i, s in enumerate(g.slots):
             hours = f"{s.start:%H:%M}–{s.end:%H:%M}"

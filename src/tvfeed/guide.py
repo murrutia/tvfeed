@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-from . import config
+from . import config, iptv
 from .config import Channel, load_channels
 from .schedule import Slot, anchor_at, build_playlist, build_schedule, position
 from .sources import Video, get_videos
@@ -131,16 +131,21 @@ def get_guide(
     channels = load_channels(CONFIG)
     if channel:
         channels = [c for c in channels if c.name == channel]
+    # Les chaînes IPTV sont en direct : ni programme, ni état, ni récupération.
+    youtube = [c for c in channels if not c.is_iptv]
     state = load_state()
-    for c in channels:
+    for c in youtube:
         state.setdefault(c.name, new_run())
     save_state(state)
 
-    videos = fetch_all(channels, refresh)
+    videos = fetch_all(youtube, refresh)
     exclude = {m.video.id for m in load_later()}
     now = datetime.now().astimezone()
     guides = []
     for c in channels:
+        if c.is_iptv:
+            guides.append(ChannelGuide(c, 0, []))
+            continue
         run = state[c.name]
         playlist = build_playlist(videos[c.name], run["seed"], exclude)
         slots = build_schedule(playlist, datetime.fromisoformat(run["anchor"]), now, hours)
@@ -157,7 +162,7 @@ def shuffle(channel: str | None = None) -> list[str]:
     Returns:
         Les noms des chaînes remélangées.
     """
-    names = [c.name for c in load_channels(CONFIG)]
+    names = [c.name for c in load_channels(CONFIG) if not c.is_iptv]
     targets = [channel] if channel else names
     state = load_state()
     for name in targets:
@@ -302,8 +307,21 @@ def save_channel(channel: Channel, previous_name: str | None = None) -> None:
         ValueError: Si le nom est déjà pris ou si une source ajoutée est invalide.
     """
     old = _channel(previous_name) if previous_name else None
-    known = set(old.sources) if old and old.per_source == channel.per_source else set()
-    check_sources([u for u in channel.sources if u not in known], channel.per_source)
+    same_kind = old and old.kind == channel.kind
+    known = set(old.sources) if same_kind and (channel.is_iptv or old.per_source == channel.per_source) else set()
+    new = [u for u in channel.sources if u not in known]
+    if channel.is_iptv:
+        # Au moins un flux doit répondre ; les autres servent de secours.
+        errors = []
+        for url in new:
+            try:
+                iptv.check_stream(url)
+            except ValueError as e:
+                errors.append(str(e))
+        if errors and len(errors) == len(channel.sources):
+            raise ValueError(errors[0])
+    else:
+        check_sources(new, channel.per_source)
     config.upsert_channel(CONFIG, channel, previous_name)
 
     if previous_name and previous_name != channel.name:

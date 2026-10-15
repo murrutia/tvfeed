@@ -391,7 +391,7 @@ export function Player({ source, now, resync, onZap, onClose }: Props) {
   )
 }
 
-function Control({
+export function Control({
   label,
   shortcut,
   children,

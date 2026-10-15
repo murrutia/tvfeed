@@ -13,23 +13,39 @@ import tomlkit
 from tomlkit.items import AoT, Table
 
 DEFAULT_PER_SOURCE = 30
+YOUTUBE = "youtube"
+IPTV = "iptv"
 
 
 @dataclass
 class Channel:
-    """Chaîne locale : un regroupement thématique de sources vidéo.
+    """Chaîne locale.
+
+    Deux sortes de chaînes : `youtube` (vidéos de plusieurs sources, mélangées dans un
+    programme) et `iptv` (une chaîne de télévision en direct, sans programme).
 
     Attributes:
         name: Titre de la chaîne, sert aussi d'identifiant.
-        sources: URL des sources (chaîne YouTube, playlist...).
+        sources: URL des sources : chaînes YouTube ou playlists, ou pour une chaîne IPTV,
+            flux HLS essayés dans l'ordre.
         themes: Thèmes de la chaîne.
-        per_source: Nombre de vidéos récentes récupérées par source.
+        per_source: Nombre de vidéos récentes récupérées par source (YouTube).
+        kind: Sorte de chaîne : `youtube` ou `iptv`.
+        logo: URL du logo (IPTV).
+        iptv_id: Identifiant de la chaîne dans le catalogue iptv-org (IPTV).
     """
 
     name: str
     sources: list[str]
     themes: list[str] = field(default_factory=list)
     per_source: int = DEFAULT_PER_SOURCE
+    kind: str = YOUTUBE
+    logo: str = ""
+    iptv_id: str = ""
+
+    @property
+    def is_iptv(self) -> bool:
+        return self.kind == IPTV
 
 
 def load_channels(path: Path) -> list[Channel]:
@@ -49,6 +65,9 @@ def load_channels(path: Path) -> list[Channel]:
             sources=c["sources"],
             themes=c.get("themes", []),
             per_source=c.get("per_source", DEFAULT_PER_SOURCE),
+            kind=c.get("kind", YOUTUBE),
+            logo=c.get("logo", ""),
+            iptv_id=c.get("iptv_id", ""),
         )
         for c in data.get("channel", [])
     ]
@@ -71,8 +90,19 @@ def _find(tables: AoT, name: str) -> Table | None:
 
 def _fill(table: Table, channel: Channel) -> None:
     table["name"] = channel.name
+    # Champs facultatifs : écrits seulement s'ils diffèrent de leur valeur par défaut.
+    optional = {
+        "kind": (channel.kind, YOUTUBE),
+        "logo": (channel.logo, ""),
+        "iptv_id": (channel.iptv_id, ""),
+    }
+    for key, (value, default) in optional.items():
+        if value != default:
+            table[key] = value
+        elif key in table:
+            del table[key]
     table["themes"] = channel.themes
-    if channel.per_source != DEFAULT_PER_SOURCE:
+    if channel.per_source != DEFAULT_PER_SOURCE and not channel.is_iptv:
         table["per_source"] = channel.per_source
     elif "per_source" in table:
         del table["per_source"]

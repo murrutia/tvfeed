@@ -27,11 +27,18 @@ Les fonctionnalités seraient :
         - [x] Avec une IA locale
             - [x] proposer des thèmes en fonction des chaînes déjà existantes
             - [x] proposer des chaînes en fonction des thèmes existants
+    - [ ] Choix de chaîne dans le header
+        - [ ] Menu déroulant avec toutes les chaînes créées
+        - [ ] Avec champ de recherche pour trouver une chaîne spécifique
 - [x] Navigation entre les chaînes
     - [x] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
 - [ ] Contrôle depuis une "télécommande"
     - [ ] Déterminer la faisabilité de contrôler l'ordi avec une manette PS3 ou une app Android
 - [ ] Proposer un mode kiosque pour être lancé sur un Raspberry Pi
+- [x] Étendre ce programme pour inclure des chaînes IPTV
+    - [x] Proposer un choix à partir de https://github.com/iptv-org/iptv
+    - [x] Permettre une recherche par mots clefs (pays, nom de la chaîne, etc.)
+    - [x] Permettre de tester le flux avant de rajouter la chaîne
 
 ## Choix de technologie
 

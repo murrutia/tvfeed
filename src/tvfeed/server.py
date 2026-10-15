@@ -9,8 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import ai, assist, config, guide
-from .config import DEFAULT_PER_SOURCE, Channel, load_channels
+from . import ai, assist, config, guide, iptv
+from .config import DEFAULT_PER_SOURCE, IPTV, YOUTUBE, Channel, load_channels
 from .schedule import Slot
 from .sources import Video, get_chapters
 
@@ -49,9 +49,13 @@ def _guide(now: datetime, guides: list[guide.ChannelGuide]) -> dict:
         "channels": [
             {
                 "name": g.channel.name,
+                "kind": g.channel.kind,
                 "themes": g.channel.themes,
                 "video_count": g.video_count,
                 "slots": [_slot(s) for s in g.slots],
+                # Chaîne IPTV : flux à essayer dans l'ordre, et logo.
+                "streams": g.channel.sources if g.channel.is_iptv else [],
+                "logo": g.channel.logo,
             }
             for g in guides
         ],
@@ -163,10 +167,16 @@ class ChannelIn(BaseModel):
     themes: list[str] = []
     sources: list[str] = Field(min_length=1)
     per_source: int = Field(DEFAULT_PER_SOURCE, ge=1, le=200)
+    kind: str = Field(YOUTUBE, pattern=f"^({YOUTUBE}|{IPTV})$")
+    logo: str = ""
+    iptv_id: str = ""
 
     def to_channel(self) -> Channel:
         clean = lambda items: list(dict.fromkeys(i.strip() for i in items if i.strip()))
-        return Channel(self.name.strip(), clean(self.sources), clean(self.themes), self.per_source)
+        return Channel(
+            self.name.strip(), clean(self.sources), clean(self.themes), self.per_source,
+            self.kind, self.logo.strip(), self.iptv_id.strip(),
+        )
 
 
 class Order(BaseModel):
@@ -265,6 +275,33 @@ def discover_channels(draft: Draft) -> dict:
         return assist.discover(draft.name.strip(), draft.themes, draft.sources, draft.use_ai)
     except Exception as e:
         raise HTTPException(502, f"Recherche impossible : {e}") from e
+
+
+def _catalog() -> iptv.Catalog:
+    try:
+        return iptv.catalog(guide.DATA / "cache" / "iptv")
+    except OSError as e:
+        raise HTTPException(502, f"Catalogue iptv-org injoignable : {e}") from e
+
+
+@app.get("/api/iptv/filters")
+def iptv_filters() -> dict:
+    """Pays et catégories du catalogue iptv-org, avec leur nombre de chaînes.
+
+    Raises:
+        HTTPException: 502 si le catalogue est injoignable.
+    """
+    return iptv.filters(_catalog())
+
+
+@app.get("/api/iptv/search")
+def iptv_search(q: str = "", country: str = "", category: str = "", limit: int = 60) -> list[dict]:
+    """Chaînes du catalogue iptv-org par mots-clés, pays (`PE`) et catégorie (`news`).
+
+    Raises:
+        HTTPException: 502 si le catalogue est injoignable.
+    """
+    return iptv.search(_catalog(), q, country, category, min(limit, 200))
 
 
 if WEB_DIST.is_dir():

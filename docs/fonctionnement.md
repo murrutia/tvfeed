@@ -62,6 +62,8 @@ les vidéos uniquement quand l'interface demande le programme.
 | `PUT /api/channels/{nom}`           | Modifie ou renomme une chaîne                 |
 | `DELETE /api/channels/{nom}`        | Supprime une chaîne                           |
 | `PUT /api/channels/order`           | Réordonne les chaînes                         |
+| `GET /api/iptv/filters`             | Pays et catégories du catalogue IPTV          |
+| `GET /api/iptv/search?q=&country=&category=` | Recherche dans le catalogue IPTV    |
 | `GET /api/ai`                       | Modèle d'IA locale disponible (ou `null`)     |
 | `POST /api/assist/themes`           | Thèmes proposés par l'IA                      |
 | `POST /api/assist/channels`         | Chaînes YouTube proposées                     |
@@ -118,6 +120,51 @@ et les réordonner.
 
 Avec Docker, `channels.toml` est monté en lecture-écriture pour que ces modifications soient
 enregistrées dans le fichier de l'hôte.
+
+## Chaînes en direct (IPTV)
+
+Une chaîne peut aussi être une chaîne de télévision en direct, prise dans le catalogue
+[iptv-org](https://github.com/iptv-org/iptv). Elle se range dans la même liste numérotée
+que les autres chaînes (raccourcis, zapping, ordre), mais **sans programme** : on la regarde
+en direct.
+
+Dans `channels.toml`, c'est une chaîne avec `kind = "iptv"` ; ses `sources` sont des flux
+HLS (`.m3u8`), essayés dans l'ordre :
+
+```toml
+[[channel]]
+name = "Latina"
+kind = "iptv"
+logo = "https://i.imgur.com/MOsWriY.png"
+iptv_id = "Latina.pe"
+themes = ["Peru", "General"]
+sources = [
+    "https://redirector.rudo.video/…/latina/latina.smil/playlist.m3u8",
+    "http://190.93.224.42/LATINA/index.m3u8",
+]
+```
+
+- **Catalogue** : [`iptv`][tvfeed.iptv] télécharge les fichiers de l'API iptv-org (chaînes,
+  flux, logos, pays, catégories) et les garde 24 h dans `data/cache/iptv/`. Sont écartés :
+  les chaînes fermées ou réservées aux adultes, et les flux qui exigent un `Referer` ou un
+  `User-Agent` particulier, qu'un navigateur ne peut pas fournir.
+- **Recherche** : par mots-clés (nom, autre nom, pays, catégorie ; accents ignorés), pays et
+  catégorie. Le panneau **Chaînes → Chaîne en direct (IPTV)** permet de tester un flux dans
+  un aperçu avant d'ajouter la chaîne. Le dernier pays choisi est retenu.
+- **Ordre des flux** : HTTPS et nom de domaine d'abord, adresse IP brute ensuite, puis la
+  meilleure qualité. À l'enregistrement, au moins un flux doit répondre.
+- **Lecture** : [hls.js](https://github.com/video-dev/hls.js) (lecture native sous Safari).
+  Si un flux échoue ou ne démarre pas en 15 s, le lecteur passe tout seul au suivant ; il
+  affiche « flux n / m ».
+
+!!! warning "Flux non officiels"
+    iptv-org recense des flux accessibles publiquement, mais tous ne sont pas diffusés par
+    la chaîne elle-même : certains, servis depuis une adresse IP, sont des rediffusions non
+    officielles. Le tri des flux propose d'abord les sources les plus probablement
+    officielles ; vérifiez ce que vous ajoutez.
+
+Le programme des chaînes IPTV n'est pas disponible : iptv-org ne publie pas de guide, seulement
+des outils pour en extraire de sites tiers. Ce pourra être un ajout facultatif.
 
 ## Aide à la création (IA locale facultative)
 

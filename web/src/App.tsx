@@ -3,6 +3,8 @@ import { Keyboard, Shuffle, SlidersHorizontal } from "lucide-react"
 
 import { ChannelManager } from "@/components/channel-manager"
 import { ChannelRow } from "@/components/channel-row"
+import { IptvPlayer } from "@/components/iptv-player"
+import { LiveRow } from "@/components/live-row"
 import { LaterRow } from "@/components/later-row"
 import { Player, type Source } from "@/components/player"
 import { Button } from "@/components/ui/button"
@@ -124,7 +126,8 @@ export default function App() {
   }
 
   let source: Source | null = null
-  if (watched) {
+  // Les chaînes IPTV ont leur propre lecteur (direct uniquement), voir plus bas.
+  if (watched && watched.kind !== "iptv") {
     source = {
       kind: "channel",
       channel: watched,
@@ -197,22 +200,27 @@ export default function App() {
             Impossible de charger le programme : {error}
           </p>
         )}
+        {watched?.kind === "iptv" && <IptvPlayer channel={watched} onZap={zap} onClose={() => setWatching(null)} />}
         {source && <Player source={source} now={now} resync={resync} onZap={zap} onClose={() => setWatching(null)} />}
         {guide && guide.later.length > 0 && (
           <LaterRow videos={guide.later} onWatch={watchLater} onRemove={(id) => leaveLater(id, unmarkVideo)} />
         )}
         {guide
-          ? guide.channels.map((c, i) => (
-              <ChannelRow
-                key={c.name}
-                number={i + 1}
-                channel={c}
-                now={now}
-                shuffling={shuffling === c.name || shuffling === "*"}
-                onShuffle={() => shuffle(c.name)}
-                onWatch={() => watch(c.name)}
-              />
-            ))
+          ? guide.channels.map((c, i) =>
+              c.kind === "iptv" ? (
+                <LiveRow key={c.name} number={i + 1} channel={c} onWatch={() => watch(c.name)} />
+              ) : (
+                <ChannelRow
+                  key={c.name}
+                  number={i + 1}
+                  channel={c}
+                  now={now}
+                  shuffling={shuffling === c.name || shuffling === "*"}
+                  onShuffle={() => shuffle(c.name)}
+                  onWatch={() => watch(c.name)}
+                />
+              ),
+            )
           : !error && Array.from({ length: 3 }, (_, i) => <ChannelSkeleton key={i} />)}
       </main>
     </div>

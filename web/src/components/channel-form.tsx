@@ -40,6 +40,7 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
   const [themes, setThemes] = useState(channel?.themes.join(", ") ?? "")
   const [sources, setSources] = useState(channel?.sources.join("\n") ?? "")
   const [perSource, setPerSource] = useState(channel?.per_source ?? DEFAULT_PER_SOURCE)
+  const isIptv = channel?.kind === "iptv"
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Aide à la création : thèmes proposés par l'IA, chaînes YouTube trouvées.
@@ -74,6 +75,10 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
     setError(null)
     try {
       await onSubmit({
+        // Une chaîne IPTV garde sa sorte, son logo et son identifiant iptv-org.
+        kind: channel?.kind,
+        logo: channel?.logo,
+        iptv_id: channel?.iptv_id,
         name: name.trim(),
         themes: themeList,
         sources: sourceList,
@@ -99,7 +104,7 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="channel-themes">Thèmes</Label>
-          {aiModel && (
+          {aiModel && !isIptv && (
             <Button
               type="button"
               variant="ghost"
@@ -139,18 +144,22 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
       </div>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="channel-sources">Sources</Label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            disabled={assisting !== null || (!name.trim() && themeList.length === 0)}
-            title={aiModel ? `Requêtes formulées par ${aiModel}, résultats de YouTube` : "Recherche YouTube à partir des thèmes"}
-            onClick={() => assist("channels", () => discoverChannels(draft()), setDiscovery)}
-          >
-            {assisting === "channels" ? <LoaderCircle className="animate-spin" /> : <Search />}
-            Trouver des chaînes
-          </Button>
+          <Label htmlFor="channel-sources">{isIptv ? "Flux" : "Sources"}</Label>
+          {!isIptv && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={assisting !== null || (!name.trim() && themeList.length === 0)}
+              title={
+                aiModel ? `Requêtes formulées par ${aiModel}, résultats de YouTube` : "Recherche YouTube à partir des thèmes"
+              }
+              onClick={() => assist("channels", () => discoverChannels(draft()), setDiscovery)}
+            >
+              {assisting === "channels" ? <LoaderCircle className="animate-spin" /> : <Search />}
+              Trouver des chaînes
+            </Button>
+          )}
         </div>
         <Textarea
           id="channel-sources"
@@ -162,22 +171,26 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
           placeholder="https://www.youtube.com/@ScienceEtonnante"
         />
         <p className="text-xs text-muted-foreground">
-          Une URL par ligne : chaîne YouTube ou playlist. Les nouvelles sources sont vérifiées à l'enregistrement.
+          {isIptv
+            ? "Une URL de flux HLS (.m3u8) par ligne, essayées dans l'ordre : les suivantes servent de secours."
+            : "Une URL par ligne : chaîne YouTube ou playlist. Les nouvelles sources sont vérifiées à l'enregistrement."}
         </p>
         {discovery && <Discoveries discovery={discovery} sources={sourceList} onAdd={addSource} />}
       </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="channel-per-source">Vidéos récentes par source</Label>
-        <Input
-          id="channel-per-source"
-          type="number"
-          min={1}
-          max={200}
-          value={perSource}
-          onChange={(e) => setPerSource(Number(e.target.value))}
-          className="w-24"
-        />
-      </div>
+      {!isIptv && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="channel-per-source">Vidéos récentes par source</Label>
+          <Input
+            id="channel-per-source"
+            type="number"
+            min={1}
+            max={200}
+            value={perSource}
+            onChange={(e) => setPerSource(Number(e.target.value))}
+            className="w-24"
+          />
+        </div>
+      )}
       {assistError && <p className="text-sm text-destructive">{assistError}</p>}
       {error && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm break-words text-destructive">
