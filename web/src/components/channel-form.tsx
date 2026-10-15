@@ -79,6 +79,9 @@ function FormBody({ channel, aiModel, onCancel, onSubmit }: Omit<Props, "open" |
         kind: channel?.kind,
         logo: channel?.logo,
         iptv_id: channel?.iptv_id,
+        // Réglage de l'image, fait depuis le lecteur : conservé tel quel.
+        aspect: channel?.aspect,
+        fill: channel?.fill,
         name: name.trim(),
         themes: themeList,
         sources: sourceList,

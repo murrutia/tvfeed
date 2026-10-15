@@ -2,22 +2,27 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronDown, ChevronUp, LoaderCircle, Maximize, Pause, Play, Radio, Volume2, VolumeX, X } from "lucide-react"
 
 import { ChannelLogo } from "@/components/channel-logo"
+import { DisplayMenu } from "@/components/display-menu"
 import { LiveVideo, type LiveStatus } from "@/components/live-video"
 import { Control } from "@/components/player"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { ChannelGuide } from "@/lib/api"
+import { videoStyle } from "@/lib/aspect"
 import { useKeydown } from "@/lib/keyboard"
 
 type Props = {
   channel: ChannelGuide
   onZap: (delta: 1 | -1) => void
   onClose: () => void
+  /** Enregistre le réglage de l'image de la chaîne. */
+  onDisplay: (display: { aspect: string; fill: boolean }) => void
 }
 
 /** Lecteur d'une chaîne IPTV : direct uniquement, sans programme ni chapitres. */
-export function IptvPlayer({ channel, onZap, onClose }: Props) {
+export function IptvPlayer({ channel, onZap, onClose, onDisplay }: Props) {
+  const frameRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [status, setStatus] = useState<LiveStatus>({ index: 0, state: "loading" })
   const [paused, setPaused] = useState(false)
@@ -43,12 +48,15 @@ export function IptvPlayer({ channel, onZap, onClose }: Props) {
     else video.pause()
   }, [])
   const toggleMute = () => videoRef.current && (videoRef.current.muted = !videoRef.current.muted)
-  const fullscreen = () => videoRef.current?.requestFullscreen().catch(() => {})
+  // Plein écran du cadre (et non de la vidéo) : le format de la chaîne s'y applique.
+  const fullscreen = () => frameRef.current?.requestFullscreen().catch(() => {})
 
   useKeydown((e) => {
     if (e.key === " ") {
       e.preventDefault()
       togglePlay()
+    } else if (e.key.toLowerCase() === "f") {
+      fullscreen()
     }
   })
 
@@ -57,8 +65,15 @@ export function IptvPlayer({ channel, onZap, onClose }: Props) {
   return (
     <Card className="py-0">
       <CardContent className="flex flex-col gap-3 p-0">
-        <div className="relative aspect-video w-full overflow-hidden bg-black sm:rounded-t-xl">
-          <LiveVideo streams={channel.streams} videoRef={videoRef} onStatus={setStatus} />
+        <div ref={frameRef} className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black sm:rounded-t-xl">
+          <div className="relative aspect-video w-[min(100%,calc(100svh*16/9))] overflow-hidden">
+            <LiveVideo
+              streams={channel.streams}
+              videoRef={videoRef}
+              onStatus={setStatus}
+              style={videoStyle(channel.aspect, channel.fill)}
+            />
+          </div>
           {status.state === "loading" && (
             <div className="pointer-events-none absolute inset-0 grid place-items-center">
               <LoaderCircle className="size-10 animate-spin text-white/80" />
@@ -114,9 +129,10 @@ export function IptvPlayer({ channel, onZap, onClose }: Props) {
             <Control label={muted ? "Rétablir le son" : "Couper le son"} onClick={toggleMute}>
               {muted ? <VolumeX /> : <Volume2 />}
             </Control>
-            <Control label="Plein écran" onClick={fullscreen}>
+            <Control shortcut="F" label="Plein écran" onClick={fullscreen}>
               <Maximize />
             </Control>
+            <DisplayMenu aspect={channel.aspect} fill={channel.fill} onChange={onDisplay} />
           </div>
         </div>
       </CardContent>

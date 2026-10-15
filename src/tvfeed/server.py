@@ -56,6 +56,8 @@ def _guide(now: datetime, guides: list[guide.ChannelGuide]) -> dict:
                 # Chaîne IPTV : flux à essayer dans l'ordre, et logo.
                 "streams": g.channel.sources if g.channel.is_iptv else [],
                 "logo": g.channel.logo,
+                "aspect": g.channel.aspect,
+                "fill": g.channel.fill,
             }
             for g in guides
         ],
@@ -170,12 +172,14 @@ class ChannelIn(BaseModel):
     kind: str = Field(YOUTUBE, pattern=f"^({YOUTUBE}|{IPTV})$")
     logo: str = ""
     iptv_id: str = ""
+    aspect: str = Field("", pattern=r"^(\d+(\.\d+)?:\d+(\.\d+)?)?$")
+    fill: bool = False
 
     def to_channel(self) -> Channel:
         clean = lambda items: list(dict.fromkeys(i.strip() for i in items if i.strip()))
         return Channel(
             self.name.strip(), clean(self.sources), clean(self.themes), self.per_source,
-            self.kind, self.logo.strip(), self.iptv_id.strip(),
+            self.kind, self.logo.strip(), self.iptv_id.strip(), self.aspect.strip(), self.fill,
         )
 
 
@@ -222,6 +226,29 @@ def reorder_channels(order: Order) -> list[dict]:
 def update_channel(name: str, channel: ChannelIn) -> list[dict]:
     """Modifie (ou renomme) une chaîne ; seules les sources ajoutées sont vérifiées."""
     return _save(channel, name)
+
+
+class Display(BaseModel):
+    """Affichage de l'image d'une chaîne."""
+
+    aspect: str = ""
+    fill: bool = False
+
+
+@app.put("/api/channels/{name}/display")
+def set_display(name: str, display: Display, hours: float = 4) -> dict:
+    """Règle le format d'image (`4:3`… ou vide) et le remplissage d'une chaîne.
+
+    Raises:
+        HTTPException: 404 si la chaîne n'existe pas, 422 si le format est invalide.
+    """
+    try:
+        config.set_display(guide.CONFIG, name, display.aspect.strip(), display.fill)
+    except KeyError as e:
+        raise HTTPException(404, f"Chaîne inconnue : {e}") from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return _guide(*guide.get_guide(hours, channel=name))
 
 
 @app.delete("/api/channels/{name}")

@@ -15,6 +15,10 @@ Les fonctionnalités seraient :
     - [x] Avancer virtuellement dans la playlist. De cette manière, en choisissant une chaîne, j'arrive en cours de vidéo.
     - [x] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
     - [x] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
+    - [ ] Affichage réduit du programme 
+        - [ ] un bouton pour passer d'un mode à l'autre
+        - [ ] grille avec juste la vignette de la vidéo en cours et ses informations pour chaque chaîne
+        - [ ] détails : micro-vignette + informations sur sa droite
 - [x] Développer une interface utilisateur
     - [x] Page basée sur le framework visuel shadcn/ui
     - [x] Serveur local
@@ -27,7 +31,7 @@ Les fonctionnalités seraient :
         - [x] Avec une IA locale
             - [x] proposer des thèmes en fonction des chaînes déjà existantes
             - [x] proposer des chaînes en fonction des thèmes existants
-    - [ ] Pouvoir changer l'aspact ratio du lecteur (avec flux vidéo qui s'y conforme)
+    - [x] Pouvoir changer l'aspact ratio du lecteur (avec flux vidéo qui s'y conforme)
     - [x] Choix de chaîne dans le header
         - [x] Menu déroulant avec toutes les chaînes créées
         - [x] Avec champ de recherche pour trouver une chaîne spécifique

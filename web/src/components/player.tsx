@@ -12,11 +12,13 @@ import {
   Rewind,
   RotateCcw,
   FastForward,
+  Maximize,
   SkipBack,
   SkipForward,
   X,
 } from "lucide-react"
 
+import { DisplayMenu } from "@/components/display-menu"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -26,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { fetchChapters, liveSlot, type ChannelGuide, type Chapter, type LaterVideo, type Slot, type Video } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { formatDuration, formatTime } from "@/lib/format"
+import { iframeStyle } from "@/lib/aspect"
 import { useKeydown } from "@/lib/keyboard"
 import { loadYouTubeApi } from "@/lib/youtube"
 
@@ -41,7 +44,13 @@ const LIVE_TOLERANCE = 5
 
 /** Ce que lit le lecteur : une chaîne calée sur la grille, ou la liste « à revoir ». */
 export type Source =
-  | { kind: "channel"; channel: ChannelGuide; onMark: (videoId: string) => void }
+  | {
+      kind: "channel"
+      channel: ChannelGuide
+      onMark: (videoId: string) => void
+      /** Enregistre le réglage de l'image de la chaîne. */
+      onDisplay: (display: { aspect: string; fill: boolean }) => void
+    }
   | {
       kind: "later"
       videos: LaterVideo[]
@@ -68,6 +77,7 @@ type Props = {
 type Request = { video: Video; slot?: Slot; start: number; key: number }
 
 export function Player({ source, now, resync, onZap, onClose }: Props) {
+  const frameRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const [ready, setReady] = useState(false)
@@ -225,6 +235,8 @@ export function Player({ source, now, resync, onZap, onClose }: Props) {
       ArrowLeft: e.shiftKey ? prevChapter : () => seek(time - 10),
       ArrowRight: e.shiftKey ? nextChapter : () => seek(time + 30),
       Home: () => seek(0),
+      // Plein écran du cadre (et non de l'iframe) : le format de la chaîne s'y applique.
+      f: () => frameRef.current?.requestFullscreen().catch(() => {}),
       ...(source.kind === "channel" && {
         d: tune,
         m: () => request && source.onMark(request.video.id),
@@ -240,7 +252,10 @@ export function Player({ source, now, resync, onZap, onClose }: Props) {
   const live = source.kind === "channel" ? liveSlot(source.channel, now) : undefined
   const video = request?.video
   const slot = request?.slot
-  const isLiveVideo = !!slot && !!live && slot.id === live.id && slot.start === live.start
+  // Même créneau que le direct : les heures recalculées par le serveur à chaque
+  // rechargement du programme peuvent différer de quelques fractions de seconde.
+  const isLiveVideo =
+    !!slot && !!live && slot.id === live.id && Math.abs(new Date(slot.start).getTime() - new Date(live.start).getTime()) < 2000
   const delay = isLiveVideo ? (now.getTime() - new Date(live.start).getTime()) / 1000 - time : null
   const isLive = delay !== null && Math.abs(delay) < LIVE_TOLERANCE
   const started = !!request && startedKey === request.key
@@ -255,8 +270,14 @@ export function Player({ source, now, resync, onZap, onClose }: Props) {
     <Card className="py-0">
       <CardContent className="grid gap-4 p-0 lg:grid-cols-[1fr_20rem]">
         <div className="flex min-w-0 flex-col gap-3">
-          <div className="relative aspect-video w-full overflow-hidden bg-black lg:rounded-tl-xl">
-            <div ref={containerRef} className="size-full [&_iframe]:size-full" />
+          <div ref={frameRef} className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-black lg:rounded-tl-xl">
+            <div className="relative aspect-video w-[min(100%,calc(100svh*16/9))] overflow-hidden">
+              <div
+                ref={containerRef}
+                className="size-full [&_iframe]:size-full"
+                style={source.kind === "channel" ? iframeStyle(source.channel.aspect, source.channel.fill) : undefined}
+              />
+            </div>
             {errorMessage && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 text-center text-white">
                 <p>{errorMessage}</p>
@@ -350,6 +371,12 @@ export function Player({ source, now, resync, onZap, onClose }: Props) {
               <Control shortcut="⇧ →" label="Chapitre suivant" onClick={nextChapter} disabled={chapterIndex + 1 >= chapters.length}>
                 <SkipForward />
               </Control>
+              <Control shortcut="F" label="Plein écran" onClick={() => frameRef.current?.requestFullscreen().catch(() => {})}>
+                <Maximize />
+              </Control>
+              {source.kind === "channel" && (
+                <DisplayMenu aspect={source.channel.aspect} fill={source.channel.fill} onChange={source.onDisplay} />
+              )}
               {source.kind === "channel" ? (
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => video && source.onMark(video.id)} disabled={!video}>

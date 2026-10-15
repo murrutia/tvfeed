@@ -33,5 +33,6 @@ export const SHORTCUTS = [
   { keys: ["⇧ ←", "⇧ →"], label: "Chapitre précédent / suivant" },
   { keys: ["Début"], label: "Revenir au début" },
   { keys: ["D"], label: "Retour au direct" },
+  { keys: ["F"], label: "Plein écran" },
   { keys: ["M"], label: "Marquer à revoir (sort la vidéo de la chaîne)" },
 ]

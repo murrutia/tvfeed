@@ -33,6 +33,10 @@ export type ChannelGuide = {
   /** Chaîne IPTV : flux HLS à essayer dans l'ordre. */
   streams: string[]
   logo: string
+  /** Format d'image imposé (`4:3`…), vide pour celui de la vidéo. */
+  aspect: string
+  /** Zoom pour remplir le lecteur (bords rognés). */
+  fill: boolean
 }
 
 export type Guide = {
@@ -64,6 +68,16 @@ export const markVideo = (channel: string, videoId: string) =>
   request("POST", `/channels/${encodeURIComponent(channel)}/videos/${videoId}/mark`)
 export const unmarkVideo = (videoId: string) => request("DELETE", `/later/${videoId}`)
 export const markDone = (videoId: string) => request("POST", `/later/${videoId}/done`)
+export async function setDisplay(channel: string, display: { aspect: string; fill: boolean }): Promise<Guide> {
+  const res = await check(
+    await fetch(`/api/channels/${encodeURIComponent(channel)}/display?hours=${HOURS}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(display),
+    }),
+  )
+  return res.json()
+}
 
 export type Chapter = {
   start: number
@@ -92,6 +106,8 @@ export type ChannelDef = {
   kind?: ChannelKind
   logo?: string
   iptv_id?: string
+  aspect?: string
+  fill?: boolean
 }
 
 async function channelsRequest(method: string, path: string, body?: unknown): Promise<ChannelDef[]> {

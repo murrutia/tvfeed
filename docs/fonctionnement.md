@@ -222,6 +222,24 @@ Retirer une vidéo d'une playlist décalerait toute la grille. Pour l'éviter :
   la vidéo suivante démarre maintenant au marquage, et que la vidéo en cours ne bouge pas
   quand une vidéo est remise dans sa chaîne.
 
+### Format de l'image
+
+Le bouton **Format** du lecteur règle l'image de la chaîne regardée, pour corriger une chaîne
+mal cadrée. Le réglage est enregistré avec la chaîne dans `channels.toml` (`aspect`, `fill`) :
+
+- **Format** : `Auto` (celui de la vidéo), `16:9`, `4:3` ou personnalisé (`21:9`, `1.85:1`…).
+  Un format imposé étire l'image à ces proportions : utile pour une image écrasée.
+- **Remplir le lecteur** : zoome l'image pour couvrir tout le lecteur, bords rognés ; utile
+  pour supprimer des bandes noires incrustées dans l'image.
+
+Le cadre du lecteur reste en 16/9. Pour l'IPTV, la balise vidéo est redimensionnée
+directement. Pour YouTube, l'image est dans une iframe qu'on ne peut pas styliser de
+l'intérieur : c'est l'iframe entière qui est déformée ou agrandie (on suppose une vidéo en
+16/9), y compris les commandes incrustées de YouTube.
+
+Le bouton plein écran du lecteur (++f++) met en plein écran le cadre entier, avec son
+format ; celui intégré à YouTube l'ignorerait.
+
 ### Raccourcis clavier
 
 | Touche          | Action                              |
@@ -236,6 +254,7 @@ Retirer une vidéo d'une playlist décalerait toute la grille. Pour l'éviter :
 | ++home++        | Revenir au début                    |
 | ++d++           | Retour au direct                    |
 | ++m++           | Marquer à revoir                    |
+| ++f++           | Plein écran                         |
 | ++0++           | Vidéos à revoir                     |
 
 Le menu de l'en-tête (++slash++ ou clic) liste toutes les chaînes avec ce qui passe en ce

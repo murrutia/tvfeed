@@ -4,6 +4,7 @@ L'écriture passe par tomlkit, qui conserve les commentaires et la mise en forme
 fichier écrit à la main.
 """
 
+import re
 import threading
 import tomllib
 from dataclasses import dataclass, field
@@ -15,6 +16,8 @@ from tomlkit.items import AoT, Table
 DEFAULT_PER_SOURCE = 30
 YOUTUBE = "youtube"
 IPTV = "iptv"
+ASPECT = re.compile(r"^\d+(\.\d+)?:\d+(\.\d+)?$")
+"""Format d'image imposé : `16:9`, `4:3`, `1.85:1`…"""
 
 
 @dataclass
@@ -33,6 +36,10 @@ class Channel:
         kind: Sorte de chaîne : `youtube` ou `iptv`.
         logo: URL du logo (IPTV).
         iptv_id: Identifiant de la chaîne dans le catalogue iptv-org (IPTV).
+        aspect: Format d'image imposé (`4:3`…) pour corriger une image déformée ; vide
+            pour garder celui de la vidéo.
+        fill: Zoomer l'image pour remplir le lecteur (bords rognés), par exemple pour
+            supprimer des bandes noires incrustées.
     """
 
     name: str
@@ -42,10 +49,27 @@ class Channel:
     kind: str = YOUTUBE
     logo: str = ""
     iptv_id: str = ""
+    aspect: str = ""
+    fill: bool = False
 
     @property
     def is_iptv(self) -> bool:
         return self.kind == IPTV
+
+
+def _channel(c: dict) -> Channel:
+    """Chaîne décrite par une table `[[channel]]`."""
+    return Channel(
+        name=c["name"],
+        sources=c["sources"],
+        themes=c.get("themes", []),
+        per_source=c.get("per_source", DEFAULT_PER_SOURCE),
+        kind=c.get("kind", YOUTUBE),
+        logo=c.get("logo", ""),
+        iptv_id=c.get("iptv_id", ""),
+        aspect=c.get("aspect", ""),
+        fill=c.get("fill", False),
+    )
 
 
 def load_channels(path: Path) -> list[Channel]:
@@ -59,18 +83,7 @@ def load_channels(path: Path) -> list[Channel]:
     """
     with path.open("rb") as f:
         data = tomllib.load(f)
-    return [
-        Channel(
-            name=c["name"],
-            sources=c["sources"],
-            themes=c.get("themes", []),
-            per_source=c.get("per_source", DEFAULT_PER_SOURCE),
-            kind=c.get("kind", YOUTUBE),
-            logo=c.get("logo", ""),
-            iptv_id=c.get("iptv_id", ""),
-        )
-        for c in data.get("channel", [])
-    ]
+    return [_channel(c) for c in data.get("channel", [])]
 
 
 # Les routes du serveur tournent dans des threads : on sérialise les écritures.
@@ -88,6 +101,14 @@ def _find(tables: AoT, name: str) -> Table | None:
     return next((t for t in tables if t["name"] == name), None)
 
 
+def _set_optional(table: Table, key: str, value, default) -> None:
+    """Écrit un champ facultatif, ou le retire s'il vaut sa valeur par défaut."""
+    if value != default:
+        table[key] = value
+    elif key in table:
+        del table[key]
+
+
 def _fill(table: Table, channel: Channel) -> None:
     table["name"] = channel.name
     # Champs facultatifs : écrits seulement s'ils diffèrent de leur valeur par défaut.
@@ -95,12 +116,11 @@ def _fill(table: Table, channel: Channel) -> None:
         "kind": (channel.kind, YOUTUBE),
         "logo": (channel.logo, ""),
         "iptv_id": (channel.iptv_id, ""),
+        "aspect": (channel.aspect, ""),
+        "fill": (channel.fill, False),
     }
     for key, (value, default) in optional.items():
-        if value != default:
-            table[key] = value
-        elif key in table:
-            del table[key]
+        _set_optional(table, key, value, default)
     table["themes"] = channel.themes
     if channel.per_source != DEFAULT_PER_SOURCE and not channel.is_iptv:
         table["per_source"] = channel.per_source
@@ -174,4 +194,30 @@ def reorder_channels(path: Path, names: list[str]) -> None:
             del tables[0]
         for t in ordered:
             tables.append(t)
+        path.write_text(tomlkit.dumps(doc))
+
+
+def set_display(path: Path, name: str, aspect: str, fill: bool) -> None:
+    """Règle l'affichage de l'image d'une chaîne, sans toucher au reste de sa définition.
+
+    Args:
+        path: Fichier des chaînes.
+        name: Nom de la chaîne.
+        aspect: Format imposé (`4:3`…), ou vide pour celui de la vidéo.
+        fill: Zoomer pour remplir le lecteur.
+
+    Raises:
+        KeyError: Si la chaîne n'existe pas.
+        ValueError: Si le format est invalide.
+    """
+    if aspect and not ASPECT.match(aspect):
+        raise ValueError(f"Format invalide : « {aspect} » (exemples : 16:9, 4:3, 1.85:1)")
+    with _lock:
+        doc, tables = _load_doc(path)
+        table = _find(tables, name)
+        if table is None:
+            raise KeyError(name)
+        # Seuls les champs d'affichage sont écrits : le reste garde sa mise en forme.
+        _set_optional(table, "aspect", aspect, "")
+        _set_optional(table, "fill", fill, False)
         path.write_text(tomlkit.dumps(doc))

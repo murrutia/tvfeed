@@ -54,3 +54,15 @@ def test_channel_crud(client):
 
     assert [c["name"] for c in client.delete("/api/channels/Musique").json()] == ["Sciences", "Histoire"]
     assert client.delete("/api/channels/Musique").status_code == 404
+
+
+def test_channel_display(client):
+    data = client.put("/api/channels/Histoire/display", json={"aspect": "1.85:1", "fill": True}).json()
+    assert [(c["name"], c["aspect"], c["fill"]) for c in data["channels"]] == [("Histoire", "1.85:1", True)]
+    assert client.put("/api/channels/Histoire/display", json={"aspect": "4/3"}).status_code == 422
+    assert client.put("/api/channels/Inconnue/display", json={}).status_code == 404
+
+    # Modifier la chaîne depuis le formulaire conserve son affichage s'il est renvoyé.
+    histoire = next(c for c in client.get("/api/channels").json() if c["name"] == "Histoire")
+    client.put("/api/channels/Histoire", json={**histoire, "themes": ["récit"]})
+    assert client.get("/api/guide").json()["channels"][1]["aspect"] == "1.85:1"

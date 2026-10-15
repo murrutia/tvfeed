@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Kbd } from "@/components/ui/kbd"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { fetchGuide, markDone, markVideo, shuffleAll, shuffleChannel, unmarkVideo, type Guide } from "@/lib/api"
+import { fetchGuide, markDone, markVideo, setDisplay, shuffleAll, shuffleChannel, unmarkVideo, type Guide } from "@/lib/api"
 import { formatTime } from "@/lib/format"
 import { SHORTCUTS, useKeydown } from "@/lib/keyboard"
 
@@ -109,6 +109,14 @@ export default function App() {
     if (watching && watching !== LATER && (!name || name === watching)) setResync((r) => r + 1)
   }
 
+  /** Applique tout de suite le réglage d'image d'une chaîne, puis l'enregistre. */
+  function changeDisplay(name: string, display: { aspect: string; fill: boolean }) {
+    // Sans cette mise à jour immédiate, un second réglage fait avant la réponse du
+    // serveur partirait de l'ancien état et écraserait le premier.
+    setGuide((prev) => prev && { ...prev, channels: prev.channels.map((c) => (c.name === name ? { ...c, ...display } : c)) })
+    load(() => setDisplay(name, display), true)
+  }
+
   function watchLater(videoId: string | null) {
     setLaterSelected(videoId)
     setResync((r) => r + 1)
@@ -141,6 +149,7 @@ export default function App() {
         await load(() => markVideo(watched.name, videoId))
         setResync((r) => r + 1)
       },
+      onDisplay: (display) => changeDisplay(watched.name, display),
     }
   } else if (watching === LATER && guide?.later.length) {
     source = {
@@ -218,7 +227,12 @@ export default function App() {
             Impossible de charger le programme : {error}
           </p>
         )}
-        {watched?.kind === "iptv" && <IptvPlayer channel={watched} onZap={zap} onClose={() => setWatching(null)} />}
+        {watched?.kind === "iptv" && <IptvPlayer
+            channel={watched}
+            onZap={zap}
+            onClose={() => setWatching(null)}
+            onDisplay={(display) => changeDisplay(watched.name, display)}
+          />}
         {source && <Player source={source} now={now} resync={resync} onZap={zap} onClose={() => setWatching(null)} />}
         {guide && guide.later.length > 0 && (
           <LaterRow videos={guide.later} onWatch={watchLater} onRemove={(id) => leaveLater(id, unmarkVideo)} />

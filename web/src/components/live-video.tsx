@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react"
+import { useEffect, useState, type CSSProperties, type RefObject } from "react"
 import Hls from "hls.js"
 
 import { cn } from "@/lib/utils"
@@ -14,6 +14,7 @@ type Props = {
   videoRef: RefObject<HTMLVideoElement | null>
   muted?: boolean
   className?: string
+  style?: CSSProperties
   onStatus?: (status: LiveStatus) => void
 }
 
@@ -21,7 +22,7 @@ type Props = {
  * Vidéo en direct (HLS) avec repli automatique sur le flux suivant en cas d'erreur.
  * hls.js partout, sauf là où le navigateur lit le HLS lui-même (Safari).
  */
-export function LiveVideo({ streams, videoRef, muted, className, onStatus }: Props) {
+export function LiveVideo({ streams, videoRef, muted, className, style, onStatus }: Props) {
   const key = streams.join("\n")
   const [status, setStatus] = useState<LiveStatus & { key: string }>({ key, index: 0, state: "loading" })
   const current = status.key === key ? status : { key, index: 0, state: "loading" as const }
@@ -82,5 +83,5 @@ export function LiveVideo({ streams, videoRef, muted, className, onStatus }: Pro
     }
   }, [key, videoRef])
 
-  return <video ref={videoRef} muted={muted} playsInline autoPlay className={cn("size-full bg-black", className)} />
+  return <video ref={videoRef} muted={muted} playsInline autoPlay style={style} className={cn("size-full bg-black", className)} />
 }
