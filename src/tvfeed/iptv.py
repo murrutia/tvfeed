@@ -2,7 +2,10 @@
 
 Le catalogue (chaînes, flux, logos, pays, catégories) est téléchargé depuis l'API publique
 d'iptv-org et gardé en cache 24 h. Seuls les flux lisibles directement par un navigateur
-sont retenus : ceux qui exigent un `Referer` ou un `User-Agent` particulier sont écartés.
+sont retenus : ceux qui exigent un `Referer` sont écartés, car un navigateur ne permet pas
+de le fixer. Ceux qui exigent un `User-Agent` sont gardés : ils veulent en général un
+navigateur (« Mozilla/5.0… ») plutôt qu'un lecteur comme VLC, et le navigateur envoie déjà
+le sien. Ils passent après les autres flux de la chaîne, au cas où.
 
 iptv-org recense des flux accessibles publiquement ; tous ne sont pas des diffusions
 officielles. Les flux sont triés pour proposer d'abord ceux servis en HTTPS par un nom de
@@ -33,10 +36,13 @@ class Stream:
     Attributes:
         url: URL du flux HLS (`.m3u8`).
         quality: Qualité annoncée (`720p`…), si connue.
+        user_agent: Le flux demande un `User-Agent` particulier ; le navigateur envoie le
+            sien, ce qui suffit le plus souvent.
     """
 
     url: str
     quality: str | None = None
+    user_agent: bool = False
 
 
 @dataclass
@@ -89,7 +95,7 @@ def _download(cache_dir: Path) -> dict[str, list]:
 
 
 def _reliability(stream: Stream) -> tuple:
-    """Clé de tri : HTTPS et nom de domaine d'abord, puis meilleure qualité."""
+    """Clé de tri : sans `User-Agent` exigé, HTTPS et nom de domaine d'abord, puis meilleure qualité."""
     host = urlparse(stream.url).hostname or ""
     try:
         ipaddress.ip_address(host)
@@ -97,7 +103,7 @@ def _reliability(stream: Stream) -> tuple:
     except ValueError:
         is_ip = False
     quality = int(re.sub(r"\D", "", stream.quality or "") or 0)
-    return (not stream.url.startswith("https://"), is_ip, -quality)
+    return (stream.user_agent, not stream.url.startswith("https://"), is_ip, -quality)
 
 
 def build_catalog(data: dict[str, list]) -> Catalog:
@@ -112,8 +118,8 @@ def build_catalog(data: dict[str, list]) -> Catalog:
     """
     streams: dict[str, list[Stream]] = {}
     for s in data["streams"]:
-        if s.get("channel") and not s.get("referrer") and not s.get("user_agent"):
-            streams.setdefault(s["channel"], []).append(Stream(s["url"], s.get("quality")))
+        if s.get("channel") and not s.get("referrer"):
+            streams.setdefault(s["channel"], []).append(Stream(s["url"], s.get("quality"), bool(s.get("user_agent"))))
     logos: dict[str, str] = {}
     for logo in data["logos"]:
         # Premier logo de la chaîne elle-même (pas d'une déclinaison régionale).
@@ -160,8 +166,8 @@ def _fold(text: str) -> str:
 def search(cat: Catalog, query: str = "", country: str = "", category: str = "", limit: int = 60) -> list[dict]:
     """Cherche des chaînes par mots-clés, pays et catégorie.
 
-    Chaque mot de la requête doit apparaître dans le nom, un autre nom, le pays ou une
-    catégorie de la chaîne. Les chaînes dont le nom commence par la requête passent devant.
+    Chaque mot de la requête doit apparaître dans le nom (avec ou sans espaces), un autre
+    nom, le pays ou une catégorie de la chaîne. Les chaînes dont le nom commence par la requête passent devant.
 
     Args:
         cat: Catalogue.
@@ -181,7 +187,8 @@ def search(cat: Catalog, query: str = "", country: str = "", category: str = "",
             continue
         place = cat.countries.get(c.country, {})
         names = _fold(" ".join([c.name, *c.alt_names]))
-        haystack = " ".join([names, _fold(place.get("name", "")), c.country.lower(), *c.categories])
+        # Noms aussi sans espaces : « vivatv » trouve « Viva TV ».
+        haystack = " ".join([names, names.replace(" ", ""), _fold(place.get("name", "")), c.country.lower(), *c.categories])
         if all(w in haystack for w in words):
             results.append((not _fold(c.name).startswith(q), q not in names, c))
     results.sort(key=lambda r: r[:2])

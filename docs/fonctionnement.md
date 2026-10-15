@@ -146,13 +146,16 @@ sources = [
 
 - **Catalogue** : [`iptv`][tvfeed.iptv] télécharge les fichiers de l'API iptv-org (chaînes,
   flux, logos, pays, catégories) et les garde 24 h dans `data/cache/iptv/`. Sont écartés :
-  les chaînes fermées ou réservées aux adultes, et les flux qui exigent un `Referer` ou un
-  `User-Agent` particulier, qu'un navigateur ne peut pas fournir.
-- **Recherche** : par mots-clés (nom, autre nom, pays, catégorie ; accents ignorés), pays et
+  les chaînes fermées ou réservées aux adultes, et les flux qui exigent un `Referer`, qu'un
+  navigateur ne peut pas fixer. Les flux qui exigent un `User-Agent` sont gardés : ils
+  attendent presque toujours un navigateur (« Mozilla/5.0… »), qui envoie déjà le sien. Ils
+  passent après les autres flux de la chaîne.
+- **Recherche** : par mots-clés (nom avec ou sans espaces, autre nom, pays, catégorie ;
+  accents ignorés), pays et
   catégorie. Le panneau **Chaînes → Chaîne en direct (IPTV)** permet de tester un flux dans
   un aperçu avant d'ajouter la chaîne. Le dernier pays choisi est retenu.
-- **Ordre des flux** : HTTPS et nom de domaine d'abord, adresse IP brute ensuite, puis la
-  meilleure qualité. À l'enregistrement, au moins un flux doit répondre.
+- **Ordre des flux** : flux sans `User-Agent` exigé d'abord, puis HTTPS et nom de domaine
+  avant adresse IP brute, puis la meilleure qualité. À l'enregistrement, au moins un flux doit répondre.
 - **Lecture** : [hls.js](https://github.com/video-dev/hls.js) (lecture native sous Safari).
   Si un flux échoue ou ne démarre pas en 15 s, le lecteur passe tout seul au suivant ; il
   affiche « flux n / m ».
@@ -162,6 +165,9 @@ sources = [
     la chaîne elle-même : certains, servis depuis une adresse IP, sont des rediffusions non
     officielles. Le tri des flux propose d'abord les sources les plus probablement
     officielles ; vérifiez ce que vous ajoutez.
+
+Une chaîne peut aussi diffuser une image figée et un son muet quand son propre encodeur est
+en panne : le flux répond normalement, le lecteur ne peut pas le détecter.
 
 Le programme des chaînes IPTV n'est pas disponible : iptv-org ne publie pas de guide, seulement
 des outils pour en extraire de sites tiers. Ce pourra être un ajout facultatif.

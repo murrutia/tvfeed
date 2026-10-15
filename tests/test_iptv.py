@@ -15,6 +15,7 @@ DATA = {
         {"id": "Adult.pe", "name": "Adult", "country": "PE", "categories": [], "is_nsfw": True},
         {"id": "Ferme.pe", "name": "Fermée", "country": "PE", "categories": [], "closed": "2020-01-01"},
         {"id": "Referer.pe", "name": "Avec referer", "country": "PE", "categories": []},
+        {"id": "Agent.ua", "name": "Avec agent", "country": "UA", "categories": []},
         {"id": "SansFlux.pe", "name": "Sans flux", "country": "PE", "categories": []},
     ],
     "streams": [
@@ -26,6 +27,8 @@ DATA = {
         {"channel": "Adult.pe", "url": "https://x.example/a.m3u8"},
         {"channel": "Ferme.pe", "url": "https://x.example/b.m3u8"},
         {"channel": "Referer.pe", "url": "https://x.example/c.m3u8", "referrer": "https://x.example/"},
+        {"channel": "Agent.ua", "url": "https://agent.example/a.m3u8", "user_agent": "Mozilla/5.0"},
+        {"channel": "Latina.pe", "url": "https://latina.example/agent.m3u8", "quality": "1080p", "user_agent": "Mozilla/5.0"},
     ],
     "logos": [
         {"channel": "Latina.pe", "feed": "HD", "url": "https://logo/feed.png"},
@@ -42,17 +45,20 @@ def catalog() -> iptv.Catalog:
 
 
 def test_catalog_keeps_only_watchable_channels(catalog):
-    # Ni adulte, ni fermée, ni flux exigeant un Referer, ni chaîne sans flux.
-    assert [c.id for c in catalog.channels] == ["CanalPeru.pe", "Latina.pe", "Noticias.ar"]
+    # Ni adulte, ni fermée, ni flux exigeant un Referer, ni chaîne sans flux. Un flux qui
+    # exige seulement un User-Agent est gardé : le navigateur envoie le sien.
+    assert [c.id for c in catalog.channels] == ["Agent.ua", "CanalPeru.pe", "Latina.pe", "Noticias.ar"]
 
 
 def test_streams_are_sorted_by_reliability_and_logo_is_the_main_one(catalog):
     latina = next(c for c in catalog.channels if c.id == "Latina.pe")
-    # HTTPS d'abord, puis nom de domaine avant adresse IP, puis meilleure qualité.
+    # HTTPS d'abord, puis nom de domaine avant adresse IP, puis meilleure qualité ; les flux
+    # qui exigent un User-Agent en dernier, même en meilleure qualité.
     assert [s.url for s in latina.streams] == [
         "https://latina.example/hd.m3u8",
         "http://latina.example/low.m3u8",
         "http://190.93.224.42/LATINA/index.m3u8",
+        "https://latina.example/agent.m3u8",
     ]
     assert latina.logo == "https://logo/latina.png"
 
@@ -67,6 +73,7 @@ def test_streams_are_sorted_by_reliability_and_logo_is_the_main_one(catalog):
         ("", "", "news", ["Canal Perú", "Noticias Ya"]),
         ("noticias argentina", "", "", ["Noticias Ya"]),  # chaque mot, n'importe où
         ("lat", "", "", ["Latina"]),
+        ("canalperu", "", "", ["Canal Perú"]),  # nom sans espaces
     ],
 )
 def test_search(catalog, query, country, category, expected):
