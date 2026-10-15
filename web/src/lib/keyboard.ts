@@ -23,6 +23,7 @@ export function useKeydown(handler: (e: KeyboardEvent) => void) {
 
 /** Raccourcis, affichés dans l'aide. */
 export const SHORTCUTS = [
+  { keys: ["/"], label: "Choisir une chaîne (recherche)" },
   { keys: ["↑", "↓"], label: "Chaîne précédente / suivante" },
   { keys: ["0"], label: "Vidéos à revoir" },
   { keys: ["1…9"], label: "Aller à la chaîne n" },

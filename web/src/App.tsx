@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Keyboard, Shuffle, SlidersHorizontal } from "lucide-react"
 
 import { ChannelManager } from "@/components/channel-manager"
+import { ChannelPicker } from "@/components/channel-picker"
 import { ChannelRow } from "@/components/channel-row"
 import { IptvPlayer } from "@/components/iptv-player"
 import { LiveRow } from "@/components/live-row"
@@ -36,6 +37,7 @@ export default function App() {
   // Incrémenté pour que le lecteur se recale après un changement de programme.
   const [resync, setResync] = useState(0)
   const [managing, setManaging] = useState(false)
+  const [picking, setPicking] = useState(false)
 
   useEffect(() => {
     history.replaceState(null, "", watching ? `#${encodeURIComponent(watching)}` : location.pathname)
@@ -57,7 +59,10 @@ export default function App() {
 
   useKeydown((e) => {
     if (!guide) return
-    if (e.key === "0") {
+    if (e.key === "/") {
+      e.preventDefault() // sinon « / » s'écrit dans le champ de recherche qui s'ouvre
+      setPicking(true)
+    } else if (e.key === "0") {
       if (guide.later.length) watchLater(null)
     } else if (/^[1-9]$/.test(e.key)) {
       const channel = guide.channels[Number(e.key) - 1]
@@ -154,6 +159,19 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <h1 className="text-xl font-semibold tracking-tight">tvfeed</h1>
           <span className="text-muted-foreground tabular-nums">{formatTime(now)}</span>
+          {guide && (
+            <ChannelPicker
+              channels={guide.channels}
+              laterCount={guide.later.length}
+              now={now}
+              watching={watching}
+              laterKey={LATER}
+              open={picking}
+              onOpenChange={setPicking}
+              onWatch={watch}
+              onWatchLater={() => watchLater(null)}
+            />
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="ml-auto" aria-label="Raccourcis clavier">

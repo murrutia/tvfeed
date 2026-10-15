@@ -27,9 +27,10 @@ Les fonctionnalités seraient :
         - [x] Avec une IA locale
             - [x] proposer des thèmes en fonction des chaînes déjà existantes
             - [x] proposer des chaînes en fonction des thèmes existants
-    - [ ] Choix de chaîne dans le header
-        - [ ] Menu déroulant avec toutes les chaînes créées
-        - [ ] Avec champ de recherche pour trouver une chaîne spécifique
+    - [ ] Pouvoir changer l'aspact ratio du lecteur (avec flux vidéo qui s'y conforme)
+    - [x] Choix de chaîne dans le header
+        - [x] Menu déroulant avec toutes les chaînes créées
+        - [x] Avec champ de recherche pour trouver une chaîne spécifique
 - [x] Navigation entre les chaînes
     - [x] Possibilité de passer à la chaîne suivante/précédente avec un raccourci clavier
 - [ ] Contrôle depuis une "télécommande"

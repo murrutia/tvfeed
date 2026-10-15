@@ -226,6 +226,7 @@ Retirer une vidéo d'une playlist décalerait toute la grille. Pour l'éviter :
 
 | Touche          | Action                              |
 | --------------- | ----------------------------------- |
+| ++slash++       | Choisir une chaîne (menu avec recherche) |
 | ++up++ / ++down++       | Chaîne précédente / suivante        |
 | ++1++ … ++9++   | Aller à la chaîne n (numéro affiché à côté de son nom) |
 | ++esc++         | Fermer le lecteur                   |
@@ -237,7 +238,11 @@ Retirer une vidéo d'une playlist décalerait toute la grille. Pour l'éviter :
 | ++m++           | Marquer à revoir                    |
 | ++0++           | Vidéos à revoir                     |
 
-La liste est aussi accessible depuis l'icône clavier en haut de la page. Un clic dans la
+Le menu de l'en-tête (++slash++ ou clic) liste toutes les chaînes avec ce qui passe en ce
+moment ; la recherche porte sur le nom, les thèmes et l'émission en cours (« magnétisme »
+trouve la chaîne qui diffuse une vidéo sur le magnétisme), sans tenir compte des accents.
+
+La liste des raccourcis est aussi accessible depuis l'icône clavier en haut de la page. Un clic dans la
 vidéo YouTube lui donnerait le focus clavier : la page le reprend aussitôt pour que les
 raccourcis restent actifs (les raccourcis propres à YouTube sont donc remplacés par ceux-ci).
 
