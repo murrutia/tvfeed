@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
-import { Keyboard, Shuffle, SlidersHorizontal } from "lucide-react"
+import { Keyboard, LayoutGrid, List, Rows3, Shuffle, SlidersHorizontal } from "lucide-react"
 
 import { ChannelManager } from "@/components/channel-manager"
 import { ChannelPicker } from "@/components/channel-picker"
 import { ChannelRow } from "@/components/channel-row"
+import { ChannelGrid, ChannelList } from "@/components/channel-views"
 import { IptvPlayer } from "@/components/iptv-player"
 import { LiveRow } from "@/components/live-row"
 import { LaterRow } from "@/components/later-row"
@@ -12,10 +13,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Kbd } from "@/components/ui/kbd"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchGuide, markDone, markVideo, setDisplay, shuffleAll, shuffleChannel, unmarkVideo, type Guide } from "@/lib/api"
 import { formatTime } from "@/lib/format"
 import { SHORTCUTS, useKeydown } from "@/lib/keyboard"
+import { summarize, summarizeLater } from "@/lib/summary"
 
 // Le serveur ne travaille qu'à la demande : on recharge le programme de temps en
 // temps pour qu'il couvre toujours les heures à venir.
@@ -23,6 +26,24 @@ const REFRESH_MS = 15 * 60 * 1000
 
 /** Identifiant de la chaîne 0 (« à revoir ») dans l'URL et la navigation. */
 const LATER = "a-revoir"
+
+/** Modes d'affichage du programme : complet, grille de vignettes, liste détaillée. */
+type View = "programme" | "grille" | "details"
+const VIEWS: { id: View; label: string; icon: typeof List }[] = [
+  { id: "programme", label: "Programme", icon: Rows3 },
+  { id: "grille", label: "Grille", icon: LayoutGrid },
+  { id: "details", label: "Détails", icon: List },
+]
+const VIEW_KEY = "tvfeed.view"
+
+function readView(): View {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    return VIEWS.some((x) => x.id === v) ? (v as View) : "programme"
+  } catch {
+    return "programme"
+  }
+}
 
 export default function App() {
   const [guide, setGuide] = useState<Guide | null>(null)
@@ -38,6 +59,17 @@ export default function App() {
   const [resync, setResync] = useState(0)
   const [managing, setManaging] = useState(false)
   const [picking, setPicking] = useState(false)
+  // Mode d'affichage, retenu dans le navigateur (confort uniquement).
+  const [view, setView] = useState(readView)
+
+  function changeView(next: View) {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Stockage indisponible : le choix vaut pour cette visite seulement.
+    }
+  }
 
   useEffect(() => {
     history.replaceState(null, "", watching ? `#${encodeURIComponent(watching)}` : location.pathname)
@@ -234,11 +266,43 @@ export default function App() {
             onDisplay={(display) => changeDisplay(watched.name, display)}
           />}
         {source && <Player source={source} now={now} resync={resync} onZap={zap} onClose={() => setWatching(null)} />}
-        {guide && guide.later.length > 0 && (
+        {guide && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-sm text-muted-foreground">Affichage</span>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={view}
+              onValueChange={(v) => v && changeView(v as View)}
+            >
+              {VIEWS.map(({ id, label, icon: Icon }) => (
+                <ToggleGroupItem key={id} value={id} aria-label={label} title={label}>
+                  <Icon />
+                  <span className="hidden sm:inline">{label}</span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+        )}
+        {guide && view !== "programme" && (
+          <CompactView
+            view={view}
+            summaries={[
+              ...(guide.later.length ? [summarizeLater(guide.later, LATER)] : []),
+              ...guide.channels.map((c, i) => summarize(c, i + 1, now)),
+            ]}
+            now={now}
+            watching={watching}
+            onWatch={(s) => (s.kind === "later" ? watchLater(null) : watch(s.key))}
+          />
+        )}
+        {guide && view === "programme" && guide.later.length > 0 && (
           <LaterRow videos={guide.later} onWatch={watchLater} onRemove={(id) => leaveLater(id, unmarkVideo)} />
         )}
         {guide
-          ? guide.channels.map((c, i) =>
+          ? view === "programme" &&
+            guide.channels.map((c, i) =>
               c.kind === "iptv" ? (
                 <LiveRow key={c.name} number={i + 1} channel={c} onWatch={() => watch(c.name)} />
               ) : (
@@ -257,6 +321,10 @@ export default function App() {
       </main>
     </div>
   )
+}
+
+function CompactView({ view, ...props }: { view: View } & React.ComponentProps<typeof ChannelGrid>) {
+  return view === "grille" ? <ChannelGrid {...props} /> : <ChannelList {...props} />
 }
 
 function ChannelSkeleton() {

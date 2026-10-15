@@ -80,6 +80,19 @@ sa progression et les vidéos suivantes. Elle avance dans la grille seconde par 
 recharge le programme toutes les 15 minutes. Les composants shadcn sont dans
 `web/src/components/ui/` et s'ajoutent avec `npx shadcn@latest add <composant>` depuis `web/`.
 
+## Modes d'affichage
+
+Au-dessus des chaînes, le sélecteur **Affichage** propose trois modes ; le choix est retenu
+dans le navigateur :
+
+- **Programme** : pour chaque chaîne, la vidéo en cours et les suivantes (mode complet) ;
+- **Grille** : une tuile par chaîne, avec la vignette de la vidéo en cours, sa progression,
+  son titre, ses horaires et la vidéo suivante ;
+- **Détails** : une ligne par chaîne, petite vignette et mêmes informations à droite.
+
+Les chaînes IPTV y apparaissent avec leur logo et le badge « En direct », la chaîne 0 avec
+la première vidéo à revoir. Un clic ouvre la chaîne dans le lecteur.
+
 ## Lecteur
 
 Cliquer sur la vidéo en cours d'une chaîne ouvre le lecteur en haut de la page, calé sur la

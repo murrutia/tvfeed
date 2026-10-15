@@ -15,10 +15,10 @@ Les fonctionnalités seraient :
     - [x] Avancer virtuellement dans la playlist. De cette manière, en choisissant une chaîne, j'arrive en cours de vidéo.
     - [x] Possibilité de naviguer dans la vidéo (revenir au début, sauter des passages, passer au chapitre suivant s'il y en a)
     - [x] Possibilité de marquer une vidéo pour relire plus tard (ça pourrait être une chaîne spéciale pour les vidéos marquées)
-    - [ ] Affichage réduit du programme 
-        - [ ] un bouton pour passer d'un mode à l'autre
-        - [ ] grille avec juste la vignette de la vidéo en cours et ses informations pour chaque chaîne
-        - [ ] détails : micro-vignette + informations sur sa droite
+    - [x] Affichage réduit du programme 
+        - [x] un bouton pour passer d'un mode à l'autre
+        - [x] grille avec juste la vignette de la vidéo en cours et ses informations pour chaque chaîne
+        - [x] détails : micro-vignette + informations sur sa droite
 - [x] Développer une interface utilisateur
     - [x] Page basée sur le framework visuel shadcn/ui
     - [x] Serveur local
