@@ -133,11 +133,13 @@ function Browser({ existing, onAdd }: Omit<Props, "open" | "onOpenChange">) {
           className="min-w-48 flex-1"
           autoFocus
         />
+        {/* `popper` : liste ouverte sous le champ. Le mode par défaut superpose l'élément
+            choisi au champ et recale la liste quand elle dépasse la fenêtre. */}
         <Select value={country} onValueChange={setCountry}>
           <SelectTrigger className="w-44" aria-label="Pays">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper" className="max-h-80">
             <SelectItem value={ALL}>Tous les pays</SelectItem>
             {filters?.countries.map((c) => (
               <SelectItem key={c.code} value={c.code}>
@@ -150,7 +152,7 @@ function Browser({ existing, onAdd }: Omit<Props, "open" | "onOpenChange">) {
           <SelectTrigger className="w-40" aria-label="Catégorie">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper" className="max-h-80">
             <SelectItem value={ALL}>Toutes catégories</SelectItem>
             {filters?.categories.map((c) => (
               <SelectItem key={c.id} value={c.id}>
